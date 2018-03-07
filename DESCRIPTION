@@ -1,0 +1,14 @@
+Package: apcwin
+Type: Package
+Title: Age-Period-Cohort Estimators
+Version: 0.1.0
+Author: Bryce Bartlett
+Maintainer: Bryce Bartlett <bryce.bartlett@duke.edu>
+Description: This package uses a Bayesian Model Averaging Esitmator for Age-Period-Cohort models.
+License: CC0
+Encoding: UTF-8
+LazyData: true
+Imports:
+  MCMCpack,
+  parallel,
+  dplyr
