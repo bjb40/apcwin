@@ -53,3 +53,19 @@ chains=apcsamp(dat,dv='egal',samples=3)
 chains=apcsamp(dat,dv='egal',samples=100,
                method='ml',cores=3)
 
+
+###########
+#testing internal ata
+#load testing data
+
+#need to make the object smaller--breaks & functions for effects
+
+data(apcsim)
+
+apcsim$c = apcsim$p-apcsim$a
+ml.draw = apcsamp(apcsim,
+                  dv='y1',
+                  method='ml',
+                  samples=100,
+                  cores=3)
+
