@@ -9,7 +9,7 @@ title: R package for Bayesian Model Averaging of the Age-Period-Cohort identific
 
 **What does it do?** Estimate hundreds of models. Get a single estimate using Bayesian statistics.
 
-**Why?** To solve perfect correlation between age, period, and cohort, but eliminate sensitivity to arbitrary modelling decisions. In other words, to get consistent, sensible estimates despite exact correlation and unidentifiability.
+**Why?** To solve perfect correlation between age, period, and cohort, but eliminate sensitivity to arbitrary modeling decisions. In other words, to get consistent, sensible estimates despite exact correlation and unidentifiability. While this package is directed to a specific problem, the approach shows promise for any application with high multicollinearity.
 
 ## Background
 
