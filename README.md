@@ -9,7 +9,7 @@ title: R package for Stochastic Window Sampling (using Bayesian Model Averaging)
 
 **What does it do?** Estimate hundreds of models using an MCMC method. Get a single estimate using Bayesian model averaging.
 
-**Why?** To solve perfect correlation between age, period, and cohort, but eliminate sensitivity to arbitrary modeling decisions. In other words, to get consistent, sensible estimates despite exact correlation and unidentifiability. While this package is directed to a specific problem, the approach shows promise for any application with high multicollinearity.
+**Why?** To solve perfect correlation between age, period, and cohort, but eliminate sensitivity to arbitrary modeling decisions. In other words, to get consistent, sensible estimates despite exact correlation and unidentifiability. While this package is directed to a specific problem, the approach shows promise for any problem with high multicollinearity.
 
 ## Background
 
