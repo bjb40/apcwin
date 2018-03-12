@@ -73,11 +73,14 @@ win = data.frame(a=numeric(), p=numeric(), c=numeric())
 breaks=list(a=list(),p=list(),c=list())
 
 d = c('a','p','c')
-dl = c(length(unique(dat$a)),length(unique(dat$p)),length(unique(dat$c)))
+dl = c(length(unique(dat$a)),
+       length(unique(dat$p)),
+       length(unique(dat$c)))
 names(dl) = d
 
 #set starting values
-all.alphas = lapply(d,function(x) data.frame(t(rep(dl[x]/2,length(unique(dat[,x]))))))
+all.alphas = lapply(d,function(x)
+  data.frame(t(rep(dl[x]/2,length(unique(dat[,x]))))))
 
 names(all.alphas) = d #names(all.nwins) = d
 
@@ -96,7 +99,9 @@ for(s in 2:n.samples){
   all.alphas= lapply(all.alphas, function(x)
     rbind(x,x[s-1,]+rnorm(ncol(x),mean=0,sd=0.5)))
 
-  for(d in seq_along(all.alphas)){rownames(all.alphas[[d]]) = 1:nrow(all.alphas[[d]])}
+  for(d in seq_along(all.alphas)){
+    rownames(all.alphas[[d]]) = 1:nrow(all.alphas[[d]])
+    }
 
   if(any(unlist(all.alphas)<0)){
 
@@ -180,10 +185,12 @@ for(s in 2:n.samples){
   grand.means=(model.matrix(form.c,grand.means))
 
 
-  blockdat=lapply(x,scopedummy)
-  #this is necessary because year values (p) are not contiguous;
-  #scopedummy assume coniguous if unique.vals is not provided...
+  #generate dummy variables to describe full range
+  blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
   blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
+  blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
+
+
   blockdat$a = relevel(blockdat$a,ref=a.b)
   blockdat$p = relevel(blockdat$p,ref=p.b)
   blockdat$c = relevel(blockdat$c,ref=c.b)
@@ -241,29 +248,38 @@ for(s in 2:n.samples){
 
 }#end sampling loop
 
-
-#allmods = allmods[2:length(allmods)]
-#effects = effects[2:length(effects)]
-#xhats = xhats[2:length(xhats)]
-#breaks = lapply(breaks, function(x)
-#  x[2:length(x)])
 breaks = lapply(breaks, function(x)
     x[1:length(x)])
 
 res = list(
   allmods=allmods,
-  effects=effects,
-  xhats=xhats,
+#  effects=effects,
+#  xhats=xhats,
   breaks=breaks,
   win=win,
   n.samples=n.samples,
   acc=acc,
-  bound=bound
+  bound=bound,
+  method=method
 )
 
 return(res)
 
 } #end draw chains
+
+
+####
+#function to draw predicted values
+
+calceff = function(mod){
+  #input is model object from lin_gibbs or lin_ml
+
+
+
+}
+
+####
+#sampler for window frame models
 
 apcsamp = function(dat,dv='y',apc=c('a','p','c'),
                    cores=1,method='gibbs',chains=1,samples=100,draws=1000){
