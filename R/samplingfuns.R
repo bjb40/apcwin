@@ -54,8 +54,6 @@ draw_chains = function(dat,dv='y',apc=c('a','p','c'),
   tm=Sys.time()
   avtm=0
 
-
-
 dat$a = dat[,apc[1]]
 dat$p = dat[,apc[2]]
 dat$c = dat[,apc[3]]
@@ -150,7 +148,7 @@ for(s in 2:n.samples){
   breaks$p[[s]]=attr(x$p,'breaks')
   breaks$c[[s]]=attr(x$c,'breaks')
 
-  #add esitmate / lin_gibbs is bayesian gibbs sampler
+  #add esitmate
   mnum = s
 
   #reassign random references to each vector
@@ -162,6 +160,7 @@ for(s in 2:n.samples){
                             C(p,contr.treatment(p.lev,base=p.b))+
                             C(c,contr.treatment(c.lev,base=c.b))"))
 
+  #generate model matrix
   xmat = model.matrix(form.c,data=x)
 
   if(method=='gibbs'){
@@ -172,6 +171,7 @@ for(s in 2:n.samples){
   #m = allmods[[s]] = tryCatch({lin_gibbs(y=y,x=xmat)},
   #                            finally=next)
 
+  #create crand means
   grand.means = data.frame(
     a = window(mean(dat$a),breaks=attr(x$a,'breaks')),
     p = window(mean(dat$p),breaks=attr(x$p,'breaks')),
@@ -184,8 +184,8 @@ for(s in 2:n.samples){
 
   grand.means=(model.matrix(form.c,grand.means))
 
-
-  #generate dummy variables to describe full range
+  #generate dummy variables to describe full range of dimension
+  blockdat = list()
   blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
   blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
   blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
@@ -221,9 +221,6 @@ for(s in 2:n.samples){
   }
 
   effects[[mnum]]$bic=m$bic
-
-  avtm=(avtm*(length(allmods)-1)+Sys.time()-tm)/length(allmods)
-  tm=Sys.time()
 
 
   if(s==2){next}
@@ -274,9 +271,9 @@ return(res)
 calceff = function(mod){
   #input is model object from lin_gibbs or lin_ml
 
-
-
 }
+
+
 
 ####
 #sampler for window frame models

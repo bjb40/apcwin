@@ -6,6 +6,10 @@
 #make an S3 object:
 #http://www.cyclismo.org/tutorial/R/s3Classes.html#memory-management
 
+print_current = function(){
+  print('\nmemoryfix branch')
+}
+
 window = function(var,winlength,breaks){
   #this function makes windows from a continuous meaasures
   #

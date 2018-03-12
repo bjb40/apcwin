@@ -66,6 +66,6 @@ apcsim$c = apcsim$p-apcsim$a
 ml.draw = apcsamp(apcsim,
                   dv='y1',
                   method='ml',
-                  samples=100,
+                  samples=3,
                   cores=3)
 
