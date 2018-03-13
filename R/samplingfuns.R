@@ -233,6 +233,8 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
 #y is a character vector for "y"
 #apc is a character vector for age, period, and cohort
 
+times = Sys.time()
+
   #generate limit cases for deleted cases
   limits = list()
   for(i in seq_along(apc)){
@@ -319,6 +321,10 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
   modsum$w_prime=exp(d)/sum(exp(d))
 
   t.samples = sum(extract(chains,'n.samples'))
+
+  fullt = Sys.time() - times
+
+
   return(list(
   limits = limits,
   summaries = cbind(
@@ -329,7 +335,8 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
   n.samples = t.samples,
   acc = sum(extract(chains,'acc'))/t.samples,
   bound = sum(extract(chains,'bound'))/t.samples,
-  method = extract(chains,'method')
+  method = extract(chains,'method'),
+  timespent = fullt
 
 ))
 #  return(list(limits,chains))
