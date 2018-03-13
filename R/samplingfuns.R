@@ -447,7 +447,10 @@ summary.apcsamp = function(samp){
   ####
   #get mean bic of APC
   cat('\n\nSamples:', samp$n.samples,
-      '\tover',samp$chains,'chains.\n\n')
+      '\tover',samp$chains,'chains.\n')
+  cat('Acceptance:',samp$acc,
+      '\tBoundary Faults:',samp$bound)
+
 
   cat('\n\nBest-fitting from full APC\n')
   cat('BIC:\t',ss$bic[best])
@@ -458,9 +461,9 @@ summary.apcsamp = function(samp){
 
   cat('Summary for limit case of null effects:\n')
   cat('BIC\n')
-  print(unlist(lapply(ml.draw1$limits,function(x) x$bic)))
+  print(unlist(lapply(samp$limits,function(x) x$bic)))
   cat('R-squared\n')
-  cat(unlist(lapply(ml.draw1$limits,function(x) x$r2)))
+  cat(unlist(lapply(samp$limits,function(x) x$r2)))
 
   cat('\n\nBayes Factors\n')
   bf = ss[best,c(8,10,12)]

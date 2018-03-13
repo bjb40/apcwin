@@ -76,5 +76,9 @@ ml.draw2 = apcsamp(apcsim,
                    cores=4)
 
 
-
+ml.gss = apcsamp(dat,
+                dv='egal',
+                method='ml',
+                samples=2500,
+                cores=4)
 
