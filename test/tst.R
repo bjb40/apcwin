@@ -72,6 +72,8 @@ testsamp = apcsamp(apcsim,
 testeff = draw_effs(testsamp,
                     tol=0.1)
 
+plot(testeff,alpha=0.05)
+
 #ml.draw1 = apcsamp(apcsim,
 #                  dv='y1',
 #                  method='ml',

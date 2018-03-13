@@ -548,3 +548,70 @@ summary.apcsamp = function(samp){
   print(bf)
 
 }
+
+
+#################
+#summarize apceffects object
+summarize.apceffects = function(effectsobj){
+  cat('coming soon...')
+}
+
+colQuant = function(df,alpha=0.05){
+  #returns quantiles
+
+  lb = alpha/2
+  ub = 1-lb
+
+  res = apply(df,2,quantile,probs=c(lb,ub))
+
+  return(res)
+
+}
+
+#################
+#plot apceffects object
+
+plot.apceffects = function(effectsobj,alpha=0.05){
+  #need to add a ci
+  #alpha is % level (two-tail)
+  require(ggplot2)
+  require(dplyr)
+
+  eff = effectsobj[['effects']]
+
+  #calculate mean
+  preds = lapply(eff,
+          function(x) colMeans(x)
+    )
+
+  #calculate intervals
+  for(i in seq_along(preds)){
+    preds[[i]] = rbind(preds[[i]],
+          colQuant(eff[[i]],alpha=alpha))
+  }
+
+  preds = lapply(preds,t)
+  preds = lapply(names(preds),
+   function(nm){
+    x = as.data.frame(preds[[nm]])
+    colnames(x) = c('Fit','ul','ll')
+    x$x = as.numeric(row.names(x))
+    x$dim = nm
+    return(x)
+    }
+
+  )
+
+  #return ggplot object
+  plt = ggplot(do.call(rbind,preds),
+               aes(x=x,y=Fit,ymax=ul,ymin=ll)) +
+    geom_line() +
+    geom_ribbon(alpha=0.25) +
+    facet_wrap(~dim,scales='free_x') +
+    xlab('') +
+    theme_classic()
+
+  return(plt)
+
+}
+
