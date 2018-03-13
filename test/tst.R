@@ -53,7 +53,6 @@ chains=apcsamp(dat,dv='egal',samples=3)
 chains=apcsamp(dat,dv='egal',samples=100,
                method='ml',cores=3)
 
-
 ###########
 #testing internal ata
 #load testing data
@@ -66,6 +65,6 @@ apcsim$c = apcsim$p-apcsim$a
 ml.draw = apcsamp(apcsim,
                   dv='y1',
                   method='ml',
-                  samples=3,
+                  samples=5,
                   cores=3)
 

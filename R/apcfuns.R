@@ -158,8 +158,6 @@ apc_lm = function(formula,data,age,per,coh,windows) {
       data[,coh]=data[,per]-data[,age]
   }
 
-
-
   #@@@@
   #window check
   if(missing(windows)){
@@ -189,7 +187,8 @@ apc_lm = function(formula,data,age,per,coh,windows) {
   ndat=cbind(ndat,wins$a,wins$p,wins$c)
   colnames(ndat)[-1:(3-ncol(ndat))] = c(age,per,coh)
 
-  blockdat=lapply(wins,scopedummy); names(blockdat)=c(age,per,coh)
+  blockdat=lapply(wins,scopedummy);
+  names(blockdat)=c(age,per,coh)
 
   #@@@@
   #estimate OLS model based on window constraints
@@ -270,8 +269,8 @@ plt = function(ols,varnames){
 #gibbs sampler
 ###############
 
-lin_gibbs = function(y,x){
-  iter = 1000
+lin_gibbs = function(y,x,iter=1000){
+  #iter = 1000
 
   rmse=ll=r2=s2=matrix(1,iter)
   b= matrix(0,iter,ncol(x))

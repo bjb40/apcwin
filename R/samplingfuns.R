@@ -49,7 +49,7 @@ draw_chains = function(dat,dv='y',apc=c('a','p','c'),
 #   source('config~.R')
 
   y = dat[,dv]
-  allmods=list() #may run into size constraints/may need to limit to best mods...
+  #allmods=list() #may run into size constraints/may need to limit to best mods...
   effects=xhats=ppd=list()
   tm=Sys.time()
   avtm=0
@@ -68,6 +68,12 @@ n.samples=samples
 
 #holder df for model summary data
 win = data.frame(a=numeric(), p=numeric(), c=numeric())
+
+modsum = data.frame( r2=numeric(),
+                     sigma=numeric(),
+                     bic=numeric(),
+                     bic_prime=numeric())
+
 breaks=list(a=list(),p=list(),c=list())
 
 d = c('a','p','c')
@@ -130,12 +136,10 @@ for(s in 2:n.samples){
     }
   }
 
-
   #draw random window samples
   x$a=window.sample(x$a,all.alphas$a[s,])
   x$p=window.sample(x$p,all.alphas$p[s,])
   x$c=window.sample(x$c,all.alphas$c[s,])
-
 
   #collect model data
   nr=data.frame(a=length(levels(x$a)),
@@ -164,13 +168,186 @@ for(s in 2:n.samples){
   xmat = model.matrix(form.c,data=x)
 
   if(method=='gibbs'){
-    m = allmods[[s]] = lin_gibbs(y=y,x=xmat)
+    m = lin_gibbs(y=y,x=xmat)
   } else if(method=='ml'){
-    m = allmods[[s]] = lin_ml(y=y,x=xmat)
+    m = lin_ml(y=y,x=xmat)
   }
+
+  modsum = rbind(modsum,
+                 m[c('sigma','r2','bic','bic_prime')])
+
   #m = allmods[[s]] = tryCatch({lin_gibbs(y=y,x=xmat)},
   #                            finally=next)
 
+
+  #if(s==1){next}
+
+  #selection criterion
+  #bayes factor approximation
+  bf=exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
+  R = min(1,bf,na.rm=TRUE)
+  #print(R)
+  if (R < runif(1)){
+    acc = acc+1
+  } else {
+
+    for(d in seq_along(all.alphas)){
+      all.alphas[[d]][s,]=all.alphas[[d]][s-1,]
+    }
+
+
+  }
+
+
+}#end sampling loop
+
+breaks = lapply(breaks, function(x)
+    x[1:length(x)])
+
+
+res = list(
+  modsum=modsum,
+#  effects=effects,
+#  xhats=xhats,
+  breaks=breaks,
+  win=win,
+  n.samples=n.samples,
+  acc=acc,
+  bound=bound,
+  method=method
+)
+
+return(res)
+
+} #end draw chains
+
+
+####
+#function to draw predicted values
+
+####
+#sampler for window frame models
+
+apcsamp = function(dat,dv='y',apc=c('a','p','c'),
+                   cores=1,method='gibbs',chains=1,samples=100,draws=1000){
+#dat is a dataframe
+#y is a character vector for "y"
+#apc is a character vector for age, period, and cohort
+
+  #generate limit cases for deleted cases
+  limits = list()
+  for(i in seq_along(apc)){
+      vec = apc[1:3 != i]
+
+      y = dat[,dv]
+      x = apply(dat[,vec],2,factor)
+      xmat = model.matrix(~., data = dat[,vec])
+
+      limits[[i]] = lin_ml(y,xmat)
+
+  }
+
+  require(parallel)
+  #create holder environment for shared variables
+  par=new.env()
+
+  #assign to environemnt to pass to clusters
+  #assign to environemnt to pass to clusters
+  assign('args',list(
+    dat=dat,
+    dv=dv,
+    apc=apc,
+    method=method,
+    samples=samples,
+    draws=draws
+  ),env=par)
+
+  cores=cores
+
+  #cat('\n\nBegin drawing', cores*samples,'total samples from',cores,'parallel chains.
+  #    This will take some time. Calculating Estimate ...')
+  #start=Sys.time()
+  #tt=do.call(draw_chains,get('args',par))
+  #sz=object.size(tt)
+  #tot=Sys.time()-start
+  #cat('\nOne sample took',round(tot,1),'seconds,',
+  #    'and uses',format(sz,'Mb'),'\n')
+  #cat(samples*cores,'parallelized would take at least',
+  #    round((samples*tot)/60,2),'minutes',
+  #    'and use',paste0(format(sz*cores*samples,'Gb'),'.\n\n'))
+
+  print(Sys.time())
+
+  cl <- makeCluster(mc <- getOption("cl.cores", cores))
+  clusterExport(cl=cl,varlist='args',envir=par)
+  #clusterExport(cl=cl, varlist=c("dat","apc",'method','samples','draws'))
+  chains=parLapply(cl=cl,1:cores,function(...){
+    args=get('args',env=par)
+    require(apcwin)
+    draw_chains(dat=args$dat,
+                dv=args$dv,
+                apc=args$apc,
+                method=args$method,
+                samples=args$samples,
+                draws=args$draws)
+  })
+
+  #end cluster
+  rm(par)
+  cat('\n\nEnd drawing chains...')
+  stopCluster(cl)
+
+  modsum = extract(chains,'modsum', as.df=TRUE)
+
+  #calculate weight by bic and bic_prime
+  k=min(modsum$bic)
+  d=-.5*(modsum$bic-k)
+  modsum$w=exp(d)/sum(exp(d))
+
+  k = min(modsum$bic_prime)
+  d=-.5*(modsum$bic_prime-k)
+  modsum$w_prime=exp(d)/sum(exp(d))
+
+  t.samples = sum(extract(chains,'n.samples'))
+  return(list(
+  limits = limits,
+  summaries = cbind(
+    extract(chains,'win',as.df=TRUE),
+            modsum),
+  breaks = extract(chains,'breaks'),
+  chains = length(chains),
+  n.samples = t.samples,
+  acc = sum(extract(chains,'acc'))/t.samples,
+  bound = sum(extract(chains,'bound'))/t.samples,
+  method = extract(chains,'method')
+
+))
+#  return(list(limits,chains))
+#save.image(file=paste0(outdir,'empirical_res.RData'))
+
+}
+
+###chain extraction
+extract = function(l,name,as.df=FALSE,span=NULL){
+  #extracts and combines name object from list 'l'
+  #span limits the extraction, if, for example, I need to drop first off
+  if(is.null(span) & !as.df){span=1:length(l[[1]][[name]])}
+
+  res=do.call(base::c,lapply(l,function(x) x[[name]][span]))
+  if(as.df){
+    res=do.call(rbind,lapply(l,function(x) x[[name]]))
+  }
+
+  return(res)
+}
+
+
+###########
+#prepare estimated effects
+
+###this needs work.... shoul feed it an a and a b
+###will need a fully bayesian esimtator
+draw_effs = function(){
   #create crand means
   grand.means = data.frame(
     a = window(mean(dat$a),breaks=attr(x$a,'breaks')),
@@ -189,7 +366,6 @@ for(s in 2:n.samples){
   blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
   blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
   blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
-
 
   blockdat$a = relevel(blockdat$a,ref=a.b)
   blockdat$p = relevel(blockdat$p,ref=p.b)
@@ -223,133 +399,5 @@ for(s in 2:n.samples){
   effects[[mnum]]$bic=m$bic
 
 
-  if(s==2){next}
-
-  #selection criterion
-
-  #bayes factor approximation
-  bf=exp((allmods[[s]]$bic-allmods[[s-1]]$bic)/2)
-  R = min(1,bf)
-  #print(R)
-  if (R < runif(1)){
-    acc = acc+1
-  } else {
-
-    for(d in seq_along(all.alphas)){
-      all.alphas[[d]][s,]=all.alphas[[d]][s-1,]
-    }
-
-
-  }
-
-
-}#end sampling loop
-
-breaks = lapply(breaks, function(x)
-    x[1:length(x)])
-
-res = list(
-  allmods=allmods,
-#  effects=effects,
-#  xhats=xhats,
-  breaks=breaks,
-  win=win,
-  n.samples=n.samples,
-  acc=acc,
-  bound=bound,
-  method=method
-)
-
-return(res)
-
-} #end draw chains
-
-
-####
-#function to draw predicted values
-
-calceff = function(mod){
-  #input is model object from lin_gibbs or lin_ml
-
-}
-
-
-
-####
-#sampler for window frame models
-
-apcsamp = function(dat,dv='y',apc=c('a','p','c'),
-                   cores=1,method='gibbs',chains=1,samples=100,draws=1000){
-#dat is a dataframe
-#y is a character vector for "y"
-#apc is a character vector for age, period, and cohort
-
-  require(parallel)
-  #create holder environment for shared variables
-  par=new.env()
-
-  #assign to environemnt to pass to clusters
-  #assign to environemnt to pass to clusters
-  assign('args',list(
-    dat=dat,
-    dv=dv,
-    apc=apc,
-    method=method,
-    samples=samples,
-    draws=draws
-  ),env=par)
-
-  cores=cores
-
-  cat('\n\nBegin drawing', cores*samples,'total samples from',cores,'parallel chains.
-      This will take some time. Calculating Estimate ...')
-  start=Sys.time()
-  tt=do.call(draw_chains,get('args',par))
-  sz=object.size(tt)
-  tot=Sys.time()-start
-  cat('\nOne sample took',round(tot,1),'seconds,',
-      'and uses',format(sz,'Mb'),'\n')
-  cat(samples*cores,'parallelized would take at least',
-      round((samples*tot)/60,2),'minutes',
-      'and use',paste0(format(sz*cores*samples,'Gb'),'.\n\n'))
-
-  print(Sys.time())
-
-  cl <- makeCluster(mc <- getOption("cl.cores", cores))
-  clusterExport(cl=cl,varlist='args',envir=par)
-  #clusterExport(cl=cl, varlist=c("dat","apc",'method','samples','draws'))
-  chains=parLapply(cl=cl,1:cores,function(...){
-    args=get('args',env=par)
-    require(apcwin)
-    draw_chains(dat=args$dat,
-                dv=args$dv,
-                apc=args$apc,
-                method=args$method,
-                samples=args$samples,
-                draws=args$draws)
-  })
-
-  #end cluster
-  rm(par)
-  cat('\n\nEnd drawing chains...')
-  stopCluster(cl)
-
-  return(chains)
-#save.image(file=paste0(outdir,'empirical_res.RData'))
-
-}
-
-###chain extraction
-extract = function(l,name,as.df=FALSE,span=NULL){
-  #extracts and combines name object from list 'l'
-  #span limits the extraction, if, for example, I need to drop first off
-  if(is.null(span) & !as.df){span=1:length(l[[1]][[name]])}
-
-  res=do.call(base::c,lapply(l,function(x) x[[name]][span]))
-  if(as.df){
-    res=do.call(rbind,lapply(l,function(x) x[[name]]))
-  }
-
-  return(res)
 }
 
