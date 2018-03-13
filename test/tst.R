@@ -63,22 +63,31 @@ data(apcsim)
 
 apcsim$c = apcsim$p-apcsim$a
 
-ml.draw1 = apcsamp(apcsim,
-                  dv='y1',
-                  method='ml',
-                  samples=1000,
-                  cores=4)
-
-ml.draw2 = apcsamp(apcsim,
-                   dv='y2',
+testsamp = apcsamp(apcsim,
+                   dv='y1',
                    method='ml',
-                   samples=1000,
-                   cores=4)
+                   samples=5,
+                   cores=2)
+
+testeff = draw_effs(testsamp,
+                    tol=0.1)
+
+#ml.draw1 = apcsamp(apcsim,
+#                  dv='y1',
+#                  method='ml',
+#                  samples=1000,
+#                  cores=4)
+
+#ml.draw2 = apcsamp(apcsim,
+#                   dv='y2',
+#                   method='ml',
+#                   samples=1000,
+#                   cores=4)
 
 
-ml.gss = apcsamp(dat,
-                dv='egal',
-                method='ml',
-                samples=2500,
-                cores=4)
+#ml.gss = apcsamp(dat,
+#                dv='egal',
+#                method='ml',
+#                samples=2500,
+#                cores=4)
 
