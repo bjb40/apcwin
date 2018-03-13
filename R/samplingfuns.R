@@ -397,13 +397,14 @@ draw_effs = function(sampobj,tol=NULL){
   dat = sampobj$data
 
   #generate holer for effects dataframe (target of function)
-  apcvals = lapply(apc,function(x) unique(dat[,x]))
-  names(apcvals) = apc
+  apcvals = lapply(sampobj$apc,
+                   function(x) unique(dat[,x]))
+  names(apcvals) = sampobj$apc
 
   effects = lapply(apcvals,function(x)
     data.frame(matrix(vector(),0,length(x))))
 
-  fits = data.frame(matrix(vector(),0,3))
+  fits = data.frame(matrix(vector(),0,4))
   colnames(fits) = c('r2','bic','bic_prime','sigma')
 
   if(is.null(tol)){tol=1/sampobj$n.samples}
@@ -546,6 +547,8 @@ summary.apcsamp = function(samp){
   cat('\n\nBayes Factors\n')
   bf = ss[best,c(8,10,12)]
   print(bf)
+  cat('\n\nBayes Factor less than 6 indicates much better fit.',
+      'Lowest BIC is usually best fitting.')
 
 }
 
