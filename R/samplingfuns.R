@@ -385,14 +385,14 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 
 ###this needs work.... shoul feed it an a and a b
 ###will need a fully bayesian esimtator
-draw_effs = function(apcsamp,tol=NULL){
-  #apcsamp is an apcsamp object
+draw_effs = function(sampobj,tol=NULL){
+  #sampobj is an apcsamp object
   #tol is a number under 1 that idientifies
   #how many posterior samples
   #returns apceffects object
 
   #tolerance is the inverse of the number of samples
-  #from apcsamp
+  #from sampobj
 
   #generate holer for effects dataframe (target of function)
   apcvals = lapply(apc,function(x) unique(dat[,x]))
@@ -401,19 +401,22 @@ draw_effs = function(apcsamp,tol=NULL){
   effects = lapply(apcvals,function(x)
     data.frame(matrix(vector(),0,length(x))))
 
-  if(is.null(tol)){tol=1/apcsamp$n.samples}
+  fits = data.frame(matrix(vector(),0,3))
+  colnames(fits) = c('r2','bic','bic_prime','sigma')
+
+  if(is.null(tol)){tol=1/sampobj$n.samples}
   n.samples = 1/tol
 
   ###
   #create random index object and draw with replacement
-  s.index = sample(1:nrow(apcsamp$summaries),
+  s.index = sample(1:nrow(sampobj$summaries),
                    n.samples,replace=TRUE,
-                   prob=apcsamp$summaries$w)
+                   prob=sampobj$summaries$w)
 
   ###
   #iterate through, drawing one Bayesian posterior each
 
-  dat = apcsamp$data
+  dat = sampobj$data
 
   for(s in s.index){
 
@@ -424,9 +427,9 @@ draw_effs = function(apcsamp,tol=NULL){
   x=dat[,c('a','p','c')]
 
   #set window breaks
-  x$a = window(x$a,breaks=apcsamp$breaks$a[[snum]])
-  x$p = window(x$p,breaks=apcsamp$breaks$p[[snum]])
-  x$c = window(x$c,breaks=apcsamp$breaks$c[[snum]])
+  x$a = window(x$a,breaks=sampobj$breaks$a[[snum]])
+  x$p = window(x$p,breaks=sampobj$breaks$p[[snum]])
+  x$c = window(x$c,breaks=sampobj$breaks$c[[snum]])
 
   #set random reference -- query whether need to
   #save reference instead; answer is probably...
@@ -435,7 +438,7 @@ draw_effs = function(apcsamp,tol=NULL){
   p.lev=length(levels(x$p)); p.b = sample(1:p.lev,1)
   c.lev=length(levels(x$c)); c.b = sample(1:c.lev,1)
 
-  y = dat[,apcsamp$dv]
+  y = dat[,sampobj$dv]
   form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
                             C(p,contr.treatment(p.lev,base=p.b))+
                             C(c,contr.treatment(c.lev,base=c.b))"))
@@ -443,10 +446,10 @@ draw_effs = function(apcsamp,tol=NULL){
   #generate model matrix
   xmat = model.matrix(form.c,data=x)
 
-
   ####
   #draw bayesian posterior
   m = lin_gibbs(y=y,x=xmat,iter=1)
+  fits = rbind(fits,m[c('r2','bic','bic_prime','sigma')])
 
   #create grand means
   grand.means = data.frame(
@@ -474,8 +477,6 @@ draw_effs = function(apcsamp,tol=NULL){
   predat=lapply(blockdat,FUN=function(x)
     model.matrix(~.,data=as.data.frame(x)))
 
-
-
   betas=list()
   for(eff in names(predat)){
     #fix colnames
@@ -492,12 +493,15 @@ draw_effs = function(apcsamp,tol=NULL){
 
   }
 
+
   }#end of sampling loop for "s"
 
   for(i in seq_along(effects)){
     colnames(effects[[i]]) = apcvals[[i]]}
 
-  res = list(sampobj=apcsamp,
+  res = list(sampobj=sampobj,
+             fit=fits,
+             sampled=s.index,
              effects=effects)
 
   class(res) = 'apceffects'
