@@ -65,12 +65,14 @@ dat$c = dat[,apc[3]]
 n.samples=samples
 
 #holder df for model summary data
-win = data.frame(a=numeric(), p=numeric(), c=numeric())
+win = data.frame(a=as.numeric(NA),
+                 p=as.numeric(NA),
+                 c=as.numeric(NA))
 
-modsum = data.frame( r2=numeric(),
-                     sigma=numeric(),
-                     bic=numeric(),
-                     bic_prime=numeric())
+modsum = data.frame( r2=as.numeric(NA),
+                     sigma=as.numeric(NA),
+                     bic=as.numeric(NA),
+                     bic_prime=as.numeric(NA))
 
 breaks=list(a=list(),p=list(),c=list())
 
@@ -92,7 +94,7 @@ acc=0
 bound=0
 
 #mcmc sampler (prior model probabilities are equal)
-for(s in 2:n.samples){
+for(s in 2:(n.samples+1)){
 
   #print(s)
   #reset dataframe
@@ -165,6 +167,7 @@ for(s in 2:n.samples){
   #generate model matrix
   xmat = model.matrix(form.c,data=x)
 
+  m= NULL
   if(method=='gibbs'){
     m = lin_gibbs(y=y,x=xmat)
   } else if(method=='ml'){
@@ -182,7 +185,10 @@ for(s in 2:n.samples){
 
   #selection criterion
   #bayes factor approximation
+
   bf=exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
+  #print(bf)
+  #print(alphas)
   R = min(1,bf,na.rm=TRUE)
   #print(R)
   if (R < runif(1)){
@@ -200,15 +206,15 @@ for(s in 2:n.samples){
 }#end sampling loop
 
 breaks = lapply(breaks, function(x)
-    x[1:length(x)])
+    x[2:length(x)])
 
 
 res = list(
-  modsum=modsum,
+  modsum=modsum[2:nrow(modsum),],
 #  effects=effects,
 #  xhats=xhats,
   breaks=breaks,
-  win=win,
+  win=win[2:nrow(modsum),],
   n.samples=n.samples,
   acc=acc,
   bound=bound,
@@ -267,16 +273,16 @@ times = Sys.time()
 
   cores=cores
 
-  #cat('\n\nBegin drawing', cores*samples,'total samples from',cores,'parallel chains.
-  #    This will take some time. Calculating Estimate ...')
-  #start=Sys.time()
-  #tt=do.call(draw_chains,get('args',par))
+  cat('\n\nBegin drawing', cores*samples,'total samples from',cores,'parallel chains.
+      This will take some time. Calculating Estimate ...')
+  start=Sys.time()
+  tt=do.call(draw_chains,get('args',par))
   #sz=object.size(tt)
-  #tot=Sys.time()-start
-  #cat('\nOne sample took',round(tot,1),'seconds,',
+  tot=Sys.time()-start
+  cat('\nOne sample took',round(tot,1),'seconds\n')
   #    'and uses',format(sz,'Mb'),'\n')
-  #cat(samples*cores,'parallelized would take at least',
-  #    round((samples*tot)/60,2),'minutes',
+  cat(samples*cores,'parallelized would take at least',
+      round((samples*tot)/60,2),'minutes.\n\n')
   #    'and use',paste0(format(sz*cores*samples,'Gb'),'.\n\n'))
 
   print(Sys.time())
@@ -322,6 +328,15 @@ times = Sys.time()
 
   t.samples = sum(extract(chains,'n.samples'))
 
+  breaks = list(
+    a=do.call(c,lapply(chains,function(x)
+      x[['breaks']][['a']])),
+    p=do.call(c,lapply(chains,function(x)
+      x[['breaks']][['p']])),
+    c=do.call(c,lapply(chains,function(x)
+      x[['breaks']][['c']]))
+  )
+
   fullt = Sys.time() - times
 
 
@@ -330,7 +345,7 @@ times = Sys.time()
   summaries = cbind(
     extract(chains,'win',as.df=TRUE),
             modsum),
-  breaks = extract(chains,'breaks'),
+  breaks = breaks,
   chains = length(chains),
   n.samples = t.samples,
   acc = sum(extract(chains,'acc'))/t.samples,
