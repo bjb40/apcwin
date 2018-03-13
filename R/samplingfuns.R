@@ -607,9 +607,9 @@ plot.apceffects = function(effectsobj,alpha=0.05){
 
   #return ggplot object
   plt = ggplot(do.call(rbind,preds),
-               aes(x=x,y=Fit,ymax=ul,ymin=ll)) +
+               aes(x=x,y=Fit)) +
     geom_line() +
-    geom_ribbon(alpha=0.25) +
+    geom_ribbon(aes(ymax=ul,ymin=ll),alpha=0.25) +
     facet_wrap(~dim,scales='free_x') +
     xlab('') +
     theme_classic()
