@@ -62,9 +62,19 @@ chains=apcsamp(dat,dv='egal',samples=100,
 data(apcsim)
 
 apcsim$c = apcsim$p-apcsim$a
+
 ml.draw1 = apcsamp(apcsim,
                   dv='y1',
                   method='ml',
                   samples=1000,
                   cores=4)
+
+ml.draw2 = apcsamp(apcsim,
+                   dv='y2',
+                   method='ml',
+                   samples=1000,
+                   cores=4)
+
+
+
 

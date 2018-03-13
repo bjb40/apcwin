@@ -239,6 +239,8 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
 #y is a character vector for "y"
 #apc is a character vector for age, period, and cohort
 
+require(parallel)
+
 times = Sys.time()
 
   #generate limit cases for deleted cases
@@ -256,7 +258,7 @@ times = Sys.time()
 
   names(limits) = paste0('no_',apc)
 
-  require(parallel)
+
   #create holder environment for shared variables
   par=new.env()
 
@@ -340,7 +342,8 @@ times = Sys.time()
   fullt = Sys.time() - times
 
 
-  return(list(
+
+  res = list(
   limits = limits,
   summaries = cbind(
     extract(chains,'win',as.df=TRUE),
@@ -351,15 +354,15 @@ times = Sys.time()
   acc = sum(extract(chains,'acc'))/t.samples,
   bound = sum(extract(chains,'bound'))/t.samples,
   method = extract(chains,'method'),
-  timespent = fullt
+  timespent = fullt)
 
-))
-#  return(list(limits,chains))
-#save.image(file=paste0(outdir,'empirical_res.RData'))
+  class(res) = append(class(res),'apcsamp')
+
+  return(res)
 
 }
 
-###chain extraction
+###helper function for chain extraction
 extract = function(l,name,as.df=FALSE,span=NULL){
   #extracts and combines name object from list 'l'
   #span limits the extraction, if, for example, I need to drop first off
@@ -433,3 +436,34 @@ draw_effs = function(){
 
 }
 
+
+###########3
+#summary function for effects class
+
+summary.apcsamp = function(samp){
+
+  ss=samp$summaries
+  best=which(ss$bic == min(ss$bic))
+  ####
+  #get mean bic of APC
+  cat('\n\nSamples:', samp$n.samples,
+      '\tover',samp$chains,'chains.\n\n')
+
+  cat('\n\nBest-fitting from full APC\n')
+  cat('BIC:\t',ss$bic[best])
+  cat('\nR-squared:\t',ss$r2[best])
+
+  cat('\n\n\nMean Number Window Breaks:\n')
+  print(apply(ss[,1:3],2,weighted.mean,w=ss$w))
+
+  cat('Summary for limit case of null effects:\n')
+  cat('BIC\n')
+  print(unlist(lapply(ml.draw1$limits,function(x) x$bic)))
+  cat('R-squared\n')
+  cat(unlist(lapply(ml.draw1$limits,function(x) x$r2)))
+
+  cat('\n\nBayes Factors\n')
+  bf = ss[best,c(8,10,12)]
+  print(bf)
+
+}
