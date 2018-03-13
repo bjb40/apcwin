@@ -3,8 +3,6 @@
 #Bryce Bartlett
 
 
-
-
 window.sample=function(var,alph){
   require(MCMCpack)
 
@@ -229,7 +227,8 @@ return(res)
 #sampler for window frame models
 
 apcsamp = function(dat,dv='y',apc=c('a','p','c'),
-                   cores=1,method='gibbs',chains=1,samples=100,draws=1000){
+                   cores=1,method='gibbs',
+                   chains=1,samples=100,draws=1000){
 #dat is a dataframe
 #y is a character vector for "y"
 #apc is a character vector for age, period, and cohort
@@ -240,12 +239,14 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
       vec = apc[1:3 != i]
 
       y = dat[,dv]
-      x = apply(dat[,vec],2,factor)
-      xmat = model.matrix(~., data = dat[,vec])
+      x = as.data.frame(apply(dat[,vec],2,as.factor))
+      xmat = model.matrix(~., data = x)
 
       limits[[i]] = lin_ml(y,xmat)
 
   }
+
+  names(limits) = paste0('no_',apc)
 
   require(parallel)
   #create holder environment for shared variables
@@ -298,6 +299,15 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
   stopCluster(cl)
 
   modsum = extract(chains,'modsum', as.df=TRUE)
+
+  #check against limits
+  for(i in names(limits)){
+    #exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
+    modsum[,paste0(i,'_bf')] =
+      (modsum$bic - limits[[i]]$bic) / 2
+    modsum[,paste0(i,'_pfprime')] =
+      (modsum$bic_prime - limits[[i]]$bic_prime) / 2
+  }
 
   #calculate weight by bic and bic_prime
   k=min(modsum$bic)
