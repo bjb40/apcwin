@@ -394,6 +394,8 @@ draw_effs = function(sampobj,tol=NULL){
   #tolerance is the inverse of the number of samples
   #from sampobj
 
+  dat = sampobj$data
+
   #generate holer for effects dataframe (target of function)
   apcvals = lapply(apc,function(x) unique(dat[,x]))
   names(apcvals) = apc
@@ -416,7 +418,7 @@ draw_effs = function(sampobj,tol=NULL){
   ###
   #iterate through, drawing one Bayesian posterior each
 
-  dat = sampobj$data
+
 
   for(s in s.index){
 
