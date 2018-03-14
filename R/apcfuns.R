@@ -6,9 +6,9 @@
 #make an S3 object:
 #http://www.cyclismo.org/tutorial/R/s3Classes.html#memory-management
 
-print_current = function(){
-  print('\nmemoryfix branch')
-}
+#print_current = function(){
+#  print('\nmemoryfix branch')
+#}
 
 window = function(var,winlength,breaks){
   #this function makes windows from a continuous meaasures
@@ -96,6 +96,18 @@ scopedummy.window = function(w,unique.vals=NULL) {
 
 range=function(w){
   UseMethod('range',w)
+}
+
+relevel.window = function(w,ref){
+  #relevels window object ---
+  #the only thing this does is to preserve the "breaks"
+  #attribute so that it is still a window
+
+  nw = relevel(w,ref)
+  attr(nw,'breaks') = attr(w,'breaks')
+  class(nw) = append(class(nw),'window')
+
+  return(nw)
 }
 
 range.window = function(w){

@@ -164,6 +164,8 @@ for(s in 2:(n.samples+1)){
                             C(p,contr.treatment(p.lev,base=p.b))+
                             C(c,contr.treatment(c.lev,base=c.b))"))
 
+
+
   #generate model matrix
   xmat = model.matrix(form.c,data=x)
 
@@ -408,7 +410,7 @@ draw_effs = function(sampobj,tol=NULL){
   colnames(fits) = c('r2','bic','bic_prime','sigma')
 
   if(is.null(tol)){tol=1/sampobj$n.samples}
-  n.samples = 1/tol
+  n.samples = floor(1/tol)
 
   ###
   #create random index object and draw with replacement
@@ -424,30 +426,39 @@ draw_effs = function(sampobj,tol=NULL){
   for(s in s.index){
 
   #sample number (easier to reference)
-  snum = s.index[s]
+  #snum = s.index[s]
 
   #reset dataframe
   x=dat[,c('a','p','c')]
 
+  breaks = sampobj$breaks
   #set window breaks
-  x$a = window(x$a,breaks=sampobj$breaks$a[[snum]])
-  x$p = window(x$p,breaks=sampobj$breaks$p[[snum]])
-  x$c = window(x$c,breaks=sampobj$breaks$c[[snum]])
+  x$a = window(x$a,breaks=breaks$a[[s]])
+  x$p = window(x$p,breaks=breaks$p[[s]])
+  x$c = window(x$c,breaks=breaks$c[[s]])
 
   #set random reference -- query whether need to
   #save reference instead; answer is probably...
   #reassign random references to each vector
-  a.lev=length(levels(x$a)); a.b = sample(1:a.lev,1)
-  p.lev=length(levels(x$p)); p.b = sample(1:p.lev,1)
-  c.lev=length(levels(x$c)); c.b = sample(1:c.lev,1)
-
-  y = dat[,sampobj$dv]
-  form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
-                            C(p,contr.treatment(p.lev,base=p.b))+
-                            C(c,contr.treatment(c.lev,base=c.b))"))
 
   #generate model matrix
-  xmat = model.matrix(form.c,data=x)
+
+
+    a.b = sample(levels(x$a),1)
+    p.b = sample(levels(x$p),1)
+    c.b = sample(levels(x$c),1)
+
+
+    #form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
+    #                              C(p,contr.treatment(p.lev,base=p.b))+
+    #                              C(c,contr.treatment(c.lev,base=c.b))"))
+
+  #print(levels(x$a))
+  x$a = relevel.window(x$a,a.b)
+  x$p = relevel.window(x$p,p.b)
+  x$c = relevel.window(x$c,c.b)
+  xmat = model.matrix(~a+p+c,data=x)
+  y = dat[,sampobj$dv]
 
   ####
   #draw bayesian posterior
@@ -456,16 +467,16 @@ draw_effs = function(sampobj,tol=NULL){
 
   #create grand means
   grand.means = data.frame(
-    a = window(mean(dat$a),breaks=attr(x$a,'breaks')),
-    p = window(mean(dat$p),breaks=attr(x$p,'breaks')),
-    c = window(mean(dat$c),breaks=attr(x$c,'breaks'))
+    a = window(mean(dat$a),breaks=breaks$a[[s]]),
+    p = window(mean(dat$p),breaks=breaks$p[[s]]),
+    c = window(mean(dat$c),breaks=breaks$c[[s]])
   )
 
   grand.means$a=relevel(grand.means$a,ref=a.b)
   grand.means$p=relevel(grand.means$p,ref=p.b)
   grand.means$c=relevel(grand.means$c,ref=c.b)
 
-  grand.means=(model.matrix(form.c,grand.means))
+  grand.means=(model.matrix(~a+p+c,grand.means))
 
   #generate dummy variables to describe full range of dimension
   blockdat = list()
@@ -473,9 +484,9 @@ draw_effs = function(sampobj,tol=NULL){
   blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
   blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
 
-  blockdat$a = relevel(blockdat$a,ref=a.b)
-  blockdat$p = relevel(blockdat$p,ref=p.b)
-  blockdat$c = relevel(blockdat$c,ref=c.b)
+  blockdat$a = relevel.window(blockdat$a,ref=a.b)
+  blockdat$p = relevel.window(blockdat$p,ref=p.b)
+  blockdat$c = relevel.window(blockdat$c,ref=c.b)
 
   predat=lapply(blockdat,FUN=function(x)
     model.matrix(~.,data=as.data.frame(x)))
@@ -489,7 +500,7 @@ draw_effs = function(sampobj,tol=NULL){
     xhat=grand.means[rep(seq(nrow(grand.means)), nrow(predat[[eff]])),]
 
     #replace means of effect dimensions with indicator in matrix
-    calceff = grepl(paste0(eff,'.lev|Intercept'),colnames(xhat))
+    calceff = grepl(paste0(eff,'|Intercept'),colnames(xhat))
     xhat[,calceff] = predat[[eff]]
 
     effects[[eff]] = rbind(effects[[eff]],t(xhat %*% t(m$betas)))
