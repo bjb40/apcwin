@@ -29,11 +29,38 @@ library(devtools)
 install_github('bjb40/apcwin')
 ```
 
-# Details
-
 
 # Example
 
+This following codeblock uses simulated data to illustrate the arguments. This returns graphical displays and identifies best-fitting models and model-breaks. 
+
+```
+###
+#load test data
+#Note, you need to name your variables
+#as follows a = age, p = period, and c= cohort
+data(apcsim)
+apcsim$c = apcsim$p-apcsim$a
+
+#this draws 2500 samples on 4 cores for 10000 model samples
+testsamp = apcsamp(dat=apcsim,
+                   dv='y1',
+                   method='ml',
+                   samples=2500,
+                   cores=4)
+
+#this summarizes the results of the apc sampler
+summarize(testsamp)
+
+
+#this draws a posterior effect sample
+#it takes a "sample" object (calculated by apcsamp)
+testeff = draw_effs(testsamp,
+                    tol=0.001)
+
+#this plots the results of the dimensions
+plot(testeff,alpha=0.05)
+```
 
 
 

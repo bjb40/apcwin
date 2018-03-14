@@ -59,19 +59,26 @@ chains=apcsamp(dat,dv='egal',samples=100,
 
 #need to make the object smaller--breaks & functions for effects
 
+###
+#load test data
+#Note, you need to name your variables
+#as follows a = age, p = period, and c= cohort
 data(apcsim)
-
 apcsim$c = apcsim$p-apcsim$a
 
-testsamp = apcsamp(apcsim,
+#this draws 2500 samples on 4 cores for 10000 model samples
+testsamp = apcsamp(dat=apcsim,
                    dv='y1',
                    method='ml',
-                   samples=5,
-                   cores=2)
+                   samples=2500,
+                   cores=4)
 
+#this draws a posterior effect sample
+#it takes a "sample" object (calculated by apcsamp)
 testeff = draw_effs(testsamp,
-                    tol=0.1)
+                    tol=0.001)
 
+#this plots the results of the dimensions
 plot(testeff,alpha=0.05)
 
 #ml.draw1 = apcsamp(apcsim,
