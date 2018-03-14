@@ -288,13 +288,14 @@ lin_gibbs = function(y,x,iter=1000){
   b= matrix(0,iter,ncol(x))
   #ytilde=yhat=matrix(0,iter,length(y))
   xtxi = solve(t(x)%*%x,tol=1e-22)
-  m=lm(y~x-1) #why no interecept???
+  m=lm(y~x-1) #no intercept because i feed it one n the x matrix
   pars=coefficients(m)
   res=residuals(m)
   n=length(y)
 
   #simulate sigma from inverse gamma marginal
-  s2 = 1/rgamma(iter,nrow(x)-ncol(x)/2,.5*t(res)%*%res)
+  #original (why 0.5?): s2 = 1/rgamma(iter,nrow(x)-ncol(x)/2,.5*t(res)%*%res)
+  s2 = sqrt(1/rgamma(iter,nrow(x)-ncol(x)/2,t(res)%*%res))
 
   #set ppd
   ppd = matrix(0,iter,length(y))
@@ -308,7 +309,7 @@ lin_gibbs = function(y,x,iter=1000){
     sst = sum((y-mean(y))^2)
     r2[i] = 1-(sse/sst)
     rmse[i] = sqrt(sse/n)
-    ll[i]=sum(dnorm(y,mean=yhat[i,],sd=s2[i],log=TRUE))
+    ll[i]=sum(dnorm(y,mean=yhat,sd=s2[i],log=TRUE))
   }
 
   colnames(b) = colnames(x)
@@ -335,8 +336,8 @@ lin_gibbs = function(y,x,iter=1000){
               r2=r2,
               #rmse=rmse,
               bic=bic,
-              bic_prime=bic_prime#,
-              #ll=ll
+              bic_prime=bic_prime,
+              ll=mean(ll)
               ))
 
 }#end linear gibbs
@@ -353,11 +354,11 @@ lin_ml = function(y,x){
   b=coefficients(m)
   s2=summary(m)$sigma
   r2=summary(m)$r.squared
-  bic_prime=n*log(r2)+(ncol(x)-1)*log(n)
-  ll=sum(dnorm(y,mean=predict(m),sd=s2))
+  bic_prime=n*log(1-r2)+(ncol(x)-1)*log(n)
+  ll=sum(dnorm(y,mean=predict(m),sd=s2,log=TRUE))
 
   #bic equation ...eq 23 http://www.stat.washington.edu/raftery/Research/PDF/kass1995.pdf
-  bic=-2*mean(ll)+log(n)*ncol(x)
+  bic=-2*ll+log(n)*ncol(x)
 
   return(list(betas=matrix(b,1,length(b)),
               y=y,
@@ -368,8 +369,8 @@ lin_ml = function(y,x){
               r2=r2,
               #rmse=rmse,
               bic=bic,
-              bic_prime=bic_prime#,
-              #ll=ll
+              bic_prime=bic_prime,
+              ll=ll
   ))
 }
 
