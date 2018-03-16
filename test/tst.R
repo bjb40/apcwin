@@ -70,8 +70,8 @@ apcsim$c = apcsim$p-apcsim$a
 testsamp = apcsamp(dat=apcsim,
                    dv='y1',
                    method='ml',
-                   samples=2500,
-                   cores=4)
+                   samples=5,
+                   cores=2)
 
 #this draws a posterior effect sample
 #it takes a "sample" object (calculated by apcsamp)

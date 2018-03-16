@@ -83,8 +83,10 @@ dl = c(length(unique(dat$a)),
 names(dl) = d
 
 #set starting values
+#use ratio of a/number of windows; sample a
+
 all.alphas = lapply(d,function(x)
-  data.frame(t(rep(dl[x]/2,length(unique(dat[,x]))))))
+  data.frame(t(rep(dl[x]/dl[x],length(unique(dat[,x]))))))
 
 names(all.alphas) = d #names(all.nwins) = d
 
@@ -100,10 +102,15 @@ for(s in 2:(n.samples+1)){
   #reset dataframe
   x=dat[,c('a','p','c')]
 
-  all.alphas= lapply(all.alphas, function(x)
-    rbind(x,x[s-1,]+rnorm(ncol(x),mean=0,sd=0.5)))
-
-  for(d in seq_along(all.alphas)){
+  #draw numerator for nwindows sd =0.5
+  #divide by nwindows
+  nalph = list()
+  for(d in names(dl)){
+    nalph[[d]] = all.alphas[[d]][s-1,]*dl[[d]]
+    nalph[[d]] = nalph[[d]] +
+      rnorm(ncol(nalph[[d]]),mean=0,sd=0.5)
+    all.alphas[[d]] = rbind(all.alphas[[d]],
+                            nalph[[d]]/dl[[d]])
     rownames(all.alphas[[d]]) = 1:nrow(all.alphas[[d]])
     }
 
