@@ -1,6 +1,6 @@
 ---
 author: Bryce Bartlett
-title: R package for Stochastic Window Sampling (using Bayesian Model Averaging) model to save the Age-Period-Cohort identification problem.
+title: R package for Stochastic Window Sampling (using Bayesian Model Averaging) model to solve the Age-Period-Cohort identification problem.
 ---
 
 # Introduction

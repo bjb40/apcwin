@@ -394,10 +394,12 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 
 ###this needs work.... shoul feed it an a and a b
 ###will need a fully bayesian esimtator
-draw_effs = function(sampobj,tol=NULL){
+draw_effs = function(sampobj,tol=NULL,marginal=FALSE){
   #sampobj is an apcsamp object
   #tol is a number under 1 that idientifies
   #how many posterior samples
+  #marginal is an indicator for marginal effects at the mean
+  #(across all other dimensions)
   #returns apceffects object
 
   #tolerance is the inverse of the number of samples
@@ -450,11 +452,9 @@ draw_effs = function(sampobj,tol=NULL){
 
   #generate model matrix
 
-
     a.b = sample(levels(x$a),1)
     p.b = sample(levels(x$p),1)
     c.b = sample(levels(x$c),1)
-
 
     #form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
     #                              C(p,contr.treatment(p.lev,base=p.b))+
@@ -464,7 +464,7 @@ draw_effs = function(sampobj,tol=NULL){
   x$a = relevel.window(x$a,a.b)
   x$p = relevel.window(x$p,p.b)
   x$c = relevel.window(x$c,c.b)
-  xmat = model.matrix(~a+p+c,data=x)
+  xmat = model.matrix(~+a+p+c,data=x) #nonintercept?
   y = dat[,sampobj$dv]
 
   ####
@@ -498,19 +498,34 @@ draw_effs = function(sampobj,tol=NULL){
   predat=lapply(blockdat,FUN=function(x)
     model.matrix(~.,data=as.data.frame(x)))
 
-  betas=list()
+  #betas=list()
   for(eff in names(predat)){
     #fix colnames
     colnames(predat[[eff]]) = sub('x',eff,colnames(predat[[eff]]))
 
-    #calculate means for xhat, & id effects at issue---this was replaced...
-    xhat=grand.means[rep(seq(nrow(grand.means)), nrow(predat[[eff]])),]
+    #calculate means for xhat -- marginal effects
+      xhat=grand.means[rep(seq(nrow(grand.means)), nrow(predat[[eff]])),]
+      xhat = xhat*-1 #this subtracts out the mean effect, should recenter
 
+      #if there is no marginal effect, delete the mean! (inefficient
+      #because no need to calculate all grand.means without marginal
+      #fix later)
+      calceff = grepl(paste0(eff,'|Intercept'),colnames(xhat))
+
+    if(!marginal){
+      cn = colnames(xhat)
+      xhat = matrix(0,nrow(xhat),ncol(xhat))
+      colnames(xhat)=cn
+
+    }
     #replace means of effect dimensions with indicator in matrix
-    calceff = grepl(paste0(eff,'|Intercept'),colnames(xhat))
     xhat[,calceff] = predat[[eff]]
+    #delete intercept term... for non-marginal
+    #xhat[,1] = 0 #intercept at 0
+    if(!marginal){xhat[,1] = 0}
 
-    effects[[eff]] = rbind(effects[[eff]],t(xhat %*% t(m$betas)))
+    effects[[eff]] =
+      rbind(effects[[eff]],t(xhat %*% t(m$betas)))
 
   }
 
