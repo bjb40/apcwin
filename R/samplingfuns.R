@@ -392,8 +392,7 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 ###########
 #prepare estimated effects
 
-###this needs work.... shoul feed it an a and a b
-###will need a fully bayesian esimtator
+#old
 draw_effs = function(sampobj,tol=NULL,marginal=FALSE){
   #sampobj is an apcsamp object
   #tol is a number under 1 that idientifies
@@ -464,7 +463,7 @@ draw_effs = function(sampobj,tol=NULL,marginal=FALSE){
   x$a = relevel.window(x$a,a.b)
   x$p = relevel.window(x$p,p.b)
   x$c = relevel.window(x$c,c.b)
-  xmat = model.matrix(~+a+p+c,data=x) #nonintercept?
+  xmat = model.matrix(~+a+p+c,data=x)
   y = dat[,sampobj$dv]
 
   ####
@@ -546,6 +545,160 @@ draw_effs = function(sampobj,tol=NULL,marginal=FALSE){
 
 
   }
+
+
+
+
+#new -- uses effects coding // explained in APC
+draw_sumeffs = function(sampobj,
+                        means=FALSE,
+                        betas=FALSE,
+                        tol=NULL){
+  #sampobj is an apcsamp object
+  #tol is a number under 1 that idientifies
+  #means True/False that indicates whether means should be used or if it should be mean centered
+  #bretas identifies whether to keep effect coding summaries
+  #how many posterior samples
+  #returns apceffects object
+
+  #tolerance is the inverse of the number of samples
+  #from sampobj
+
+  require(dplyr)
+
+  dat = sampobj$data
+
+  #generate holer for effects dataframe (target of function)
+  apcvals = lapply(sampobj$apc,
+                   function(x) unique(dat[,x]))
+  names(apcvals) = sampobj$apc
+
+  effects = lapply(apcvals,function(x)
+    data.frame(matrix(vector(),0,length(x))))
+
+  fits = data.frame(matrix(vector(),0,4))
+  colnames(fits) = c('r2','bic','bic_prime','sigma')
+
+  if(is.null(tol)){tol=1/sampobj$n.samples}
+  n.samples = floor(1/tol)
+
+  ###
+  #create random index object and draw with replacement
+  s.index = sample(1:nrow(sampobj$summaries),
+                   n.samples,replace=TRUE,
+                   prob=sampobj$summaries$w)
+
+
+  if(betas){raw.betas = list()}
+  intercept=vector()
+
+  ###
+  #iterate through, drawing one Bayesian posterior each
+
+
+
+  for(s in s.index){
+
+    #sample number (easier to reference)
+    #snum = s.index[s]
+
+    #reset dataframe
+    x=dat[,c('a','p','c')]
+
+    breaks = sampobj$breaks
+    #set window breaks
+    x$a = window(x$a,breaks=breaks$a[[s]])
+    x$p = window(x$p,breaks=breaks$p[[s]])
+    x$c = window(x$c,breaks=breaks$c[[s]])
+
+    #id dependent variable
+    y = dat[,sampobj$dv]
+    #create model matrix with "effect coding"
+    xmat = model.matrix(~+a+p+c,data=x,
+                        contrasts.arg=list(
+                          a='contr.sum',
+                          p='contr.sum',
+                          c='contr.sum'
+                        ))
+
+
+    ####
+    #draw bayesian posterior
+    m = lin_gibbs(y=y,x=xmat,iter=1)
+    fits = rbind(fits,m[c('r2','bic','bic_prime','sigma')])
+
+    #caluclate marginalize effects, i.e. calcate marginal means using effects coding
+    #this is just the sum of intercept and effect, ommited category is -1*sum(othercats)
+    #omitted  categroy for effects coding in R is the last category
+    #see Hardy 1993 and summary from APC project for examples
+    marginals = lapply(c('a','p','c'), FUN = function(d){
+                       e=as.data.frame(m$betas) %>% select(starts_with(d))
+                       #calculate effect ofr omitted category
+                       e[,ncol(e)+1] = -1*rowSums(e)
+                       #add grand mean for expected marginal
+                       if(means){e = e + m$betas[,1]}
+                       colnames(e) = paste0(d,levels(x[,d]))
+                       return(e)
+
+                       })#end lapply
+
+    #save intercept value / otherwise it is in the marginal...
+    intercept = c(intercept,m$betas[1])
+
+    names(marginals) = c('a','p','c')
+
+    #generate dummy variables to describe full range of dimension
+    blockdat = list()
+    blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
+    blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
+    blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
+
+
+    predat=lapply(c('a','p','c'), FUN=function(d)
+       model.matrix(~.-1,data=as.data.frame(blockdat[[d]])) %*%
+         t(as.matrix(marginals[[d]]))
+       )
+
+    names(predat) = c('a','p','c')
+
+    #draw betas if requested across entire length
+    if(betas){
+      beta = lapply(c('a','p','c'), FUN=function(d){
+        b = m$betas[grepl(d,colnames(m$betas))]
+        names(b) = paste0(d,levels(x[,d])[1:length(b)])
+        return(b)
+        })
+      beta = c(list(`(Intercept)` = m$betas[1]),beta)
+      raw.betas[[length(raw.betas)+1]] = do.call(c,beta)
+    }#end conditional for betas
+
+    for(eff in names(predat)){
+
+      effects[[eff]] =
+        rbind(effects[[eff]],t(predat[[eff]]))
+
+    }
+
+
+  }#end of sampling loop for "s"
+
+  for(i in seq_along(effects)){
+    colnames(effects[[i]]) = apcvals[[i]]}
+
+  res = list(sampobj=sampobj,
+             fit=fits,
+             sampled=s.index,
+             effects=effects,
+             intercept=intercept)
+
+  if(betas){res[['betas']] = raw.betas}
+
+  class(res) = 'apceffects'
+
+  return(res)
+
+
+}
 
 
 
