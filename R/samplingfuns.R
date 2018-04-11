@@ -630,7 +630,7 @@ draw_sumeffs = function(sampobj,
     #omitted  categroy for effects coding in R is the last category
     #see Hardy 1993 and summary from APC project for examples
     marginals = lapply(c('a','p','c'), FUN = function(d){
-                       e=as.data.frame(m$betas) %>% select(starts_with(d))
+                       e=as.data.frame(m$betas) %>% dplyr::select(starts_with(d))
                        #calculate effect ofr omitted category
                        e[,ncol(e)+1] = -1*rowSums(e)
                        #add grand mean for expected marginal
