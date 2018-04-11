@@ -595,8 +595,6 @@ draw_sumeffs = function(sampobj,
   ###
   #iterate through, drawing one Bayesian posterior each
 
-
-
   for(s in s.index){
 
     #sample number (easier to reference)
@@ -661,7 +659,7 @@ draw_sumeffs = function(sampobj,
 
     names(predat) = c('a','p','c')
 
-    #draw betas if requested across entire length
+    #draw betas, if requested, across entire length
     if(betas){
       beta = lapply(c('a','p','c'), FUN=function(d){
         b = m$betas[grepl(d,colnames(m$betas))]
@@ -702,7 +700,7 @@ draw_sumeffs = function(sampobj,
 
 
 
-###########3
+###########
 #summary function for effects class
 
 summary.apcsamp = function(samp){
@@ -760,9 +758,12 @@ colQuant = function(df,alpha=0.05){
 #################
 #plot apceffects object
 
-plot.apceffects = function(effectsobj,alpha=0.05){
+plot.apceffects = function(effectsobj,
+                           alpha=0.05,
+                           adj.se=TRUE){
   #need to add a ci
   #alpha is % level (two-tail)
+  #adj.se adjusts ll and ul using mean level window breaks
   require(ggplot2)
   require(dplyr)
 
@@ -791,14 +792,50 @@ plot.apceffects = function(effectsobj,alpha=0.05){
 
   )
 
+  preds=do.call(rbind,preds)
+
+  #adj.se calculates an adjusted standard error where each dimension shares a variance,
+  #and the pooled "n" is the weighted average of observed window breaks
+  if(adj.se){
+    sds = unlist(lapply(names(effectsobj$effects),function(x){
+      sd(unlist(effectsobj$effects[[x]]))
+    }))
+
+    names(sds) = c('a','p','c')
+    sds = as.data.frame(sds)
+
+    #sds$n = c(length(unique(tdat$a)),length(unique(tdat$p)),length(unique(tdat$c)))
+    sds$n = apply(effectsobj$sampobj$summaries[,c('a','p','c')],2,
+                  weighted.mean,w=effectsobj$sampobj$summaries$w)
+    sds$se = sds$sds/sqrt(sds$n)
+
+    preds = merge(preds,as.data.frame(sds),by.x='dim',by.y='row.names')
+    preds$crit = qt(1-alpha,df=preds$n)
+
+  }
+
+  preds = preds %>%
+    arrange(dim) %>%
+    mutate(dim_f = factor(dim,labels=c('Age','Cohort','Period')))
+
+  preds$dim_f = factor(preds$dim_f,levels=c('Age','Period','Cohort'))
+
   #return ggplot object
-  plt = ggplot(do.call(rbind,preds),
+  plt = ggplot(preds,
                aes(x=x,y=Fit)) +
     geom_line() +
     geom_ribbon(aes(ymax=ul,ymin=ll),alpha=0.25) +
-    facet_wrap(~dim,scales='free_x') +
+    facet_wrap(~dim_f,scales='free_x') +
     xlab('') +
-    theme_classic()
+    theme_classic() +
+    theme(axis.text.x = element_text(angle=45,hjust=1))
+
+
+  if(adj.se == TRUE){
+    plt = plt +
+      geom_errorbar(aes(ymax=Fit + crit*se,ymin=Fit-crit*se))
+  }
+
 
   return(plt)
 
