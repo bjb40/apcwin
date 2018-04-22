@@ -42,12 +42,31 @@ window.sample=function(var,alph){
   return(wins)
 }
 
+#' Draw a single chain.
+#'
+#' @param dat A dataframe.
+#' @param dv A character variable or column number indicating the dependent variable.
+#' @param apc A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').
+#' @param cores Integer indicating cores to use.
+#' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
+#' @param samples Integer indicating samples; used only for "gibbs" method.
+#' @param draws Integer indicating the number of models to sample in the chain.
+#' @param starvals Optional list for chain starting values.
+#' @return An object of apcsamp.
+#' @examples
+#' data(apcsamp)
+#' draw_chains(apcsamp,method='ml',samples=250,cores=4,chains=4)
+
+
 draw_chains = function(dat,dv='y',apc=c('a','p','c'),
-                       cores=1,method='gibbs',chains=1,samples=10,draws=1000){
-#   source('config~.R')
+                       cores=1,
+                       method='gibbs',
+                       chains=1,
+                       samples=10,
+                       draws=1000,
+                       startvals=NULL){
 
   y = dat[,dv]
-  #allmods=list() #may run into size constraints/may need to limit to best mods...
   effects=xhats=ppd=list()
   tm=Sys.time()
   avtm=0
@@ -55,11 +74,6 @@ draw_chains = function(dat,dv='y',apc=c('a','p','c'),
 dat$a = dat[,apc[1]]
 dat$p = dat[,apc[2]]
 dat$c = dat[,apc[3]]
-
-#dat = dat %>%
-#  rename(a=dat[,apc[1]],
-#         p=dat[,apc[2]],
-#         c=dat[,apc[3]])
 
 #set of numbers of random samples
 n.samples=samples
@@ -85,10 +99,26 @@ names(dl) = d
 #set starting values
 #use ratio of a/number of windows; sample a
 
-all.alphas = lapply(d,function(x)
-  data.frame(t(rep(dl[x]/dl[x],length(unique(dat[,x]))))))
+  all.alphas = lapply(d,function(x)
+    data.frame(t(rep(dl[x]/dl[x],length(unique(dat[,x]))))))
 
-names(all.alphas) = d #names(all.nwins) = d
+  names(all.alphas) = d #names(all.nwins) = d
+
+if(!is.null(startvals)){
+  svals = unlist(lapply(startvals,length))
+  alphvals = unlist(lapply(all.alphas,length))
+  errormessage = paste(c("Problem with dimensions of supplied starting values.",
+  "\n\tNumber of values supplied:",svals,
+  "\n\tNumber of values needed:",alphvals),collapse=' ')
+
+
+  if(!all(svals==alphvals)){
+    stop(errormessage)
+  } else{
+    all.alphas = startvals
+  }
+
+}
 
 #accept rate
 acc=0
@@ -186,20 +216,10 @@ for(s in 2:(n.samples+1)){
   modsum = rbind(modsum,
                  m[c('sigma','r2','bic','bic_prime')])
 
-  #m = allmods[[s]] = tryCatch({lin_gibbs(y=y,x=xmat)},
-  #                            finally=next)
-
-
-  #if(s==1){next}
-
-  #selection criterion
-  #bayes factor approximation
-
   bf=exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
-  #print(bf)
-  #print(alphas)
+
+  #jumping kernel
   R = min(1,bf,na.rm=TRUE)
-  #print(R)
   if (R < runif(1)){
     acc = acc+1
   } else {
@@ -220,8 +240,7 @@ breaks = lapply(breaks, function(x)
 
 res = list(
   modsum=modsum[2:nrow(modsum),],
-#  effects=effects,
-#  xhats=xhats,
+  alphas=all.alphas,
   breaks=breaks,
   win=win[2:nrow(modsum),],
   n.samples=n.samples,
@@ -235,11 +254,21 @@ return(res)
 } #end draw chains
 
 
-####
-#function to draw predicted values
-
-####
-#sampler for window frame models
+#' A wrapper for "draw_chains" that will use multiple search chains in the algorithm.
+#'
+#' @param dat A dataframe.
+#' @param dv A character variable or column number indicating the dependent variable.
+#' @param apc A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').
+#' @param cores Integer indicating cores to use.
+#' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
+#' @param samples Integer indicating samples; used only for "gibbs" method.
+#' @param draws Integer indicating the number of models to sample in the chain.
+#' @param starvals Optional list for chain starting values.
+#' @details what does this look like.
+#' @return An object of apcsamp.
+#' @examples
+#' data(apcsim)
+#' apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
 
 apcsamp = function(dat,dv='y',apc=c('a','p','c'),
                    cores=1,method='gibbs',
@@ -392,165 +421,23 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 ###########
 #prepare estimated effects
 
-#old
-draw_effs = function(sampobj,tol=NULL,marginal=FALSE){
-  #sampobj is an apcsamp object
-  #tol is a number under 1 that idientifies
-  #how many posterior samples
-  #marginal is an indicator for marginal effects at the mean
-  #(across all other dimensions)
-  #returns apceffects object
+#' Draws effect estimates from an APC sample using Bayesian Model Averaging.
+#'
+#' @param sampobj An apcsamp object (\code{\link{apcsamp}})
+#' @param means Logical: TRUE returns mean estimates; FALSE generates centered estimates (relatvie to grand mean).
+#' @param betas Logical: TRUE returns a vector of the betas.
+#' @param tol A number between 0 and 1, which indicates tolerance to rounding and the number
+#' to be drawn. e.g. tol=0.001 is tolerance to the third decimal and draws 1,000 samples.
+#' @return An object of apceffects.
+#' @examples
+#' data(apcsim)
+#'
+#' sampleobject = apcsamp(apcsim,method='ml',
+#' samples=250,cores=4,chains=4)
+#'
+#' effectsobject = draw_effs(sampleobject)
 
-  #tolerance is the inverse of the number of samples
-  #from sampobj
-
-  dat = sampobj$data
-
-  #generate holer for effects dataframe (target of function)
-  apcvals = lapply(sampobj$apc,
-                   function(x) unique(dat[,x]))
-  names(apcvals) = sampobj$apc
-
-  effects = lapply(apcvals,function(x)
-    data.frame(matrix(vector(),0,length(x))))
-
-  fits = data.frame(matrix(vector(),0,4))
-  colnames(fits) = c('r2','bic','bic_prime','sigma')
-
-  if(is.null(tol)){tol=1/sampobj$n.samples}
-  n.samples = floor(1/tol)
-
-  ###
-  #create random index object and draw with replacement
-  s.index = sample(1:nrow(sampobj$summaries),
-                   n.samples,replace=TRUE,
-                   prob=sampobj$summaries$w)
-
-  ###
-  #iterate through, drawing one Bayesian posterior each
-
-
-
-  for(s in s.index){
-
-  #sample number (easier to reference)
-  #snum = s.index[s]
-
-  #reset dataframe
-  x=dat[,c('a','p','c')]
-
-  breaks = sampobj$breaks
-  #set window breaks
-  x$a = window(x$a,breaks=breaks$a[[s]])
-  x$p = window(x$p,breaks=breaks$p[[s]])
-  x$c = window(x$c,breaks=breaks$c[[s]])
-
-  #set random reference -- query whether need to
-  #save reference instead; answer is probably...
-  #reassign random references to each vector
-
-  #generate model matrix
-
-    a.b = sample(levels(x$a),1)
-    p.b = sample(levels(x$p),1)
-    c.b = sample(levels(x$c),1)
-
-    #form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
-    #                              C(p,contr.treatment(p.lev,base=p.b))+
-    #                              C(c,contr.treatment(c.lev,base=c.b))"))
-
-  #print(levels(x$a))
-  x$a = relevel.window(x$a,a.b)
-  x$p = relevel.window(x$p,p.b)
-  x$c = relevel.window(x$c,c.b)
-  xmat = model.matrix(~+a+p+c,data=x)
-  y = dat[,sampobj$dv]
-
-  ####
-  #draw bayesian posterior
-  m = lin_gibbs(y=y,x=xmat,iter=1)
-  fits = rbind(fits,m[c('r2','bic','bic_prime','sigma')])
-
-  #create grand means
-  grand.means = data.frame(
-    a = window(mean(dat$a),breaks=breaks$a[[s]]),
-    p = window(mean(dat$p),breaks=breaks$p[[s]]),
-    c = window(mean(dat$c),breaks=breaks$c[[s]])
-  )
-
-  grand.means$a=relevel(grand.means$a,ref=a.b)
-  grand.means$p=relevel(grand.means$p,ref=p.b)
-  grand.means$c=relevel(grand.means$c,ref=c.b)
-
-  grand.means=(model.matrix(~a+p+c,grand.means))
-
-  #generate dummy variables to describe full range of dimension
-  blockdat = list()
-  blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
-  blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
-  blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
-
-  blockdat$a = relevel.window(blockdat$a,ref=a.b)
-  blockdat$p = relevel.window(blockdat$p,ref=p.b)
-  blockdat$c = relevel.window(blockdat$c,ref=c.b)
-
-  predat=lapply(blockdat,FUN=function(x)
-    model.matrix(~.,data=as.data.frame(x)))
-
-  #betas=list()
-  for(eff in names(predat)){
-    #fix colnames
-    colnames(predat[[eff]]) = sub('x',eff,colnames(predat[[eff]]))
-
-    #calculate means for xhat -- marginal effects
-      xhat=grand.means[rep(seq(nrow(grand.means)), nrow(predat[[eff]])),]
-      xhat = xhat*-1 #this subtracts out the mean effect, should recenter
-
-      #if there is no marginal effect, delete the mean! (inefficient
-      #because no need to calculate all grand.means without marginal
-      #fix later)
-      calceff = grepl(paste0(eff,'|Intercept'),colnames(xhat))
-
-    if(!marginal){
-      cn = colnames(xhat)
-      xhat = matrix(0,nrow(xhat),ncol(xhat))
-      colnames(xhat)=cn
-
-    }
-    #replace means of effect dimensions with indicator in matrix
-    xhat[,calceff] = predat[[eff]]
-    #delete intercept term... for non-marginal
-    #xhat[,1] = 0 #intercept at 0
-    if(!marginal){xhat[,1] = 0}
-
-    effects[[eff]] =
-      rbind(effects[[eff]],t(xhat %*% t(m$betas)))
-
-  }
-
-
-  }#end of sampling loop for "s"
-
-  for(i in seq_along(effects)){
-    colnames(effects[[i]]) = apcvals[[i]]}
-
-  res = list(sampobj=sampobj,
-             fit=fits,
-             sampled=s.index,
-             effects=effects)
-
-  class(res) = 'apceffects'
-
-  return(res)
-
-
-  }
-
-
-
-
-#new -- uses effects coding // explained in APC
-draw_sumeffs = function(sampobj,
+draw_effs = function(sampobj,
                         means=FALSE,
                         betas=FALSE,
                         tol=NULL){
@@ -703,6 +590,7 @@ draw_sumeffs = function(sampobj,
 ###########
 #summary function for effects class
 
+#'@export
 summary.apcsamp = function(samp){
 
   ss=samp$summaries
@@ -758,6 +646,7 @@ colQuant = function(df,alpha=0.05){
 #################
 #plot apceffects object
 
+#'@export
 plot.apceffects = function(effectsobj,
                            alpha=0.05,
                            adj.se=TRUE){
@@ -840,4 +729,8 @@ plot.apceffects = function(effectsobj,
   return(plt)
 
 }
+
+
+
+
 

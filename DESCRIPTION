@@ -12,3 +12,4 @@ Imports:
   MCMCpack,
   parallel,
   dplyr
+RoxygenNote: 6.0.1
