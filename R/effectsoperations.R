@@ -1,10 +1,11 @@
 ####
 #collecting effects operations
 
+#' @export
 delt = function(effectsobj){
   delt = lapply(names(effectsobj$effects),FUN=function(x){
     df = effectsobj$effects[[x]]
-    df = df[,order(colnames(df))]
+    df = df[,order(as.numeric(colnames(df)))]
     res=list()
     cnames=character()
     for(col in 1:(ncol(df)-1)){
@@ -22,6 +23,7 @@ delt = function(effectsobj){
   return(delt)
 }
 
+#' @export
 tstdiff = function(effectsobj){
 
   delt = delt(effectsobj)

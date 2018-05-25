@@ -10,6 +10,7 @@
 #  print('\nmemoryfix branch')
 #}
 
+#' @export
 window = function(var,winlength,breaks){
   #this function makes windows from a continuous meaasures
   #
@@ -63,6 +64,7 @@ if(!is.na(winlength)){
 
 }
 
+#' @export
 scopedummy=function(w,unique.vals=NULL){
   #this is a method for window object that transforms it
   #into a factor covering all possible continuous values
@@ -75,10 +77,12 @@ scopedummy=function(w,unique.vals=NULL){
 
 }
 
+#' @export
 scopedummy.default = function(w,unique.vals=NULL) {
   cat('\nError: Must use window object.\n\n')
 }
 
+#' @export
 scopedummy.window = function(w,unique.vals=NULL) {
   #w is a window object
   #unique.vals is a vector of numbers that shows unique values, if null, then it
@@ -94,10 +98,12 @@ scopedummy.window = function(w,unique.vals=NULL) {
   return(f)
 }
 
+#' @export
 range=function(w){
   UseMethod('range',w)
 }
 
+#' @export
 relevel.window = function(w,ref){
   #relevels window object ---
   #the only thing this does is to preserve the "breaks"
@@ -110,15 +116,18 @@ relevel.window = function(w,ref){
   return(nw)
 }
 
+#' @export
 range.window = function(w){
   #returns range object (from underlying continuous)
   return(attr(w,'range'))
 }
 
+#' @export
 expand=function(w){
   UseMethod('expand',w)
 }
 
+#' @export
 expand.window=function(w){
   r=range(w)
   return(r[1]:r[2])
@@ -281,6 +290,7 @@ plt = function(ols,varnames){
 #gibbs sampler
 ###############
 
+#' @export
 lin_gibbs = function(y,x,iter=1000){
   #iter = 1000
 
@@ -323,6 +333,7 @@ lin_gibbs = function(y,x,iter=1000){
   bic_prime=n*log(1-mean(r2))+(ncol(x)-1)*log(n)
   #bic equation ...eq 23 http://www.stat.washington.edu/raftery/Research/PDF/kass1995.pdf
   bic=-2*mean(ll)+log(n)*ncol(x)
+  aic=-2*mean(ll)+2*ncol(x)
 
   #print(dim(yhat))
 
@@ -336,6 +347,7 @@ lin_gibbs = function(y,x,iter=1000){
               r2=r2,
               #rmse=rmse,
               bic=bic,
+              aic=aic,
               bic_prime=bic_prime,
               ll=mean(ll)
               ))
@@ -347,6 +359,7 @@ lin_gibbs = function(y,x,iter=1000){
 #iterates faster, but not a true bayesian
 ###############
 
+#' @export
 lin_ml = function(y,x){
 
   n=length(y)
@@ -359,16 +372,19 @@ lin_ml = function(y,x){
 
   #bic equation ...eq 23 http://www.stat.washington.edu/raftery/Research/PDF/kass1995.pdf
   bic=-2*ll+log(n)*ncol(x)
+  aic=-2*ll+2*ncol(x)
 
   return(list(betas=matrix(b,1,length(b)),
               y=y,
               x=x,
-              #yhat=yhat,
+              sse=sum(residuals(m)^2),
+              rank = m$rank,
               sigma=s2,
               #ytilde=yhat+rnorm(length(yhat),mean=0,sd=s2),
               r2=r2,
               #rmse=rmse,
               bic=bic,
+              aic=aic,
               bic_prime=bic_prime,
               ll=ll
   ))

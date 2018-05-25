@@ -22,7 +22,7 @@ apcsamp(dat, dv = "y", apc = c("a", "p", "c"), cores = 1,
 
 \item{draws}{Integer indicating the number of models to sample in the chain.}
 
-\item{starvals}{Optional list for chain starting values.}
+\item{startvals}{Optional list for chain starting values.}
 }
 \value{
 An object of apcsamp.
@@ -36,4 +36,5 @@ what does this look like.
 \examples{
 data(apcsim)
 apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
+
 }

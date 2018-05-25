@@ -11,7 +11,7 @@ draw_effs(sampobj, means = FALSE, betas = FALSE, tol = NULL)
 
 \item{means}{Logical: TRUE returns mean estimates; FALSE generates centered estimates (relatvie to grand mean).}
 
-\item{betas}{Logical: TRUE returns actual estimates.}
+\item{betas}{Logical: TRUE returns a vector of the betas.}
 
 \item{tol}{A number between 0 and 1, which indicates tolerance to rounding and the number
 to be drawn. e.g. tol=0.001 is tolerance to the third decimal and draws 1,000 samples.}
@@ -29,4 +29,5 @@ sampleobject = apcsamp(apcsim,method='ml',
 samples=250,cores=4,chains=4)
 
 effectsobject = draw_effs(sampleobject)
+
 }

@@ -2,7 +2,7 @@
 #
 #Bryce Bartlett
 
-
+#' @export
 window.sample=function(var,alph){
   require(MCMCpack)
 
@@ -56,8 +56,6 @@ window.sample=function(var,alph){
 #' @examples
 #' data(apcsamp)
 #' draw_chains(apcsamp,method='ml',samples=250,cores=4,chains=4)
-
-
 draw_chains = function(dat,dv='y',apc=c('a','p','c'),
                        cores=1,
                        method='gibbs',
@@ -84,8 +82,12 @@ win = data.frame(a=as.numeric(NA),
                  c=as.numeric(NA))
 
 modsum = data.frame( r2=as.numeric(NA),
+                     #sse = as.numeric(NA),
+                     #rank = as.numeric(NA),
+                     #n=nrow(dat),
                      sigma=as.numeric(NA),
                      bic=as.numeric(NA),
+                     aic=as.numeric(NA),
                      bic_prime=as.numeric(NA))
 
 breaks=list(a=list(),p=list(),c=list())
@@ -214,12 +216,21 @@ for(s in 2:(n.samples+1)){
   }
 
   modsum = rbind(modsum,
-                 m[c('sigma','r2','bic','bic_prime')])
+                 m[c('sigma','r2','bic','aic','bic_prime')])
 
-  bf=exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
+  #specialized anova approximation
+  #bf=n*log(sum(residuals(m1)^2)/sum(residuals(m2)^2)) + (k1-k2)*log(n)
+  #simple and old approximation
+
+  #original--
+  #bf=exp((modsum[s,'bic']-modsum[s-1,'bic'])*.5) #.5 is even prior
+
+  #odds
+  modds = exp((modsum[s,'bic']-modsum[s-1,'bic']))
+  mprob = modds/(1+modds)
 
   #jumping kernel
-  R = min(1,bf,na.rm=TRUE)
+  R = min(1,mprob,na.rm=TRUE)
   if (R < runif(1)){
     acc = acc+1
   } else {
@@ -263,19 +274,21 @@ return(res)
 #' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
 #' @param samples Integer indicating samples; used only for "gibbs" method.
 #' @param draws Integer indicating the number of models to sample in the chain.
-#' @param starvals Optional list for chain starting values.
+#' @param startvals Optional list for chain starting values.
+#'
 #' @details what does this look like.
+#'
 #' @return An object of apcsamp.
+#'
 #' @examples
 #' data(apcsim)
 #' apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
-
+#'
+#' @export
 apcsamp = function(dat,dv='y',apc=c('a','p','c'),
                    cores=1,method='gibbs',
                    chains=1,samples=100,draws=1000){
-#dat is a dataframe
-#y is a character vector for "y"
-#apc is a character vector for age, period, and cohort
+
 
 require(parallel)
 
@@ -327,10 +340,10 @@ times = Sys.time()
 
   print(Sys.time())
 
-  cl <- makeCluster(mc <- getOption("cl.cores", cores))
-  clusterExport(cl=cl,varlist='args',envir=par)
+  cl <- parallel::makeCluster(mc <- getOption("cl.cores", cores))
+  parallel::clusterExport(cl=cl,varlist='args',envir=par)
   #clusterExport(cl=cl, varlist=c("dat","apc",'method','samples','draws'))
-  chains=parLapply(cl=cl,1:cores,function(...){
+  chains=parallel::parLapply(cl=cl,1:cores,function(...){
     args=get('args',env=par)
     require(apcwin)
     draw_chains(dat=args$dat,
@@ -344,7 +357,7 @@ times = Sys.time()
   #end cluster
   rm(par)
   cat('\n\nEnd drawing chains...')
-  stopCluster(cl)
+  parallel::stopCluster(cl)
 
   modsum = extract(chains,'modsum', as.df=TRUE)
 
@@ -358,8 +371,9 @@ times = Sys.time()
   }
 
   #calculate weight by bic and bic_prime
-  k=min(modsum$bic)
-  d=-.5*(modsum$bic-k)
+  #https://stats.stackexchange.com/questions/249888/use-bic-or-aic-as-approximation-for-bayesian-model-averaging
+  k=min(modsum$aic)
+  d=-.5*(modsum$aic-k)
   modsum$w=exp(d)/sum(exp(d))
 
   k = min(modsum$bic_prime)
@@ -377,14 +391,23 @@ times = Sys.time()
       x[['breaks']][['c']]))
   )
 
+  alphas = list(
+    a = do.call(rbind,lapply(chains, function(x)
+      x[['alphas']][['a']])),
+    p = do.call(rbind,lapply(chains,function(x)
+      x[['alphas']][['p']])),
+    c = do.call(rbind,lapply(chains,function(x)
+      x[['alphas']][['c']]))
+  )
+
+
   fullt = Sys.time() - times
-
-
 
   res = list(
   data = dat,
   apc = apc,
   dv = dv,
+  alphas = alphas,
   limits = limits,
   summaries = cbind(
     extract(chains,'win',as.df=TRUE),
@@ -402,6 +425,51 @@ times = Sys.time()
   return(res)
 
 }
+
+#' @export
+convergence = function(samp) {
+  UseMethod('convergence',samp)
+}
+
+
+#' @export
+convergence.default = function(samp) {
+  cat('\nError: Must use apcsamp object.\n\n')
+}
+
+###helper function for convergence
+#' @export
+convergence.apcsamp = function(samp){
+  require(coda)
+
+  d = samp[['apc']]
+
+  alphas = lapply(d,function(dims){
+    alph = as.data.frame(samp$alpha[[dims]])
+    colnames(alph) = paste0(dims,
+      unique(samp$data[,dims])[order(unique(samp$data[,dims]))])
+    return(alph)
+  })
+
+  alphas = do.call(cbind,alphas)
+  nc = ncol(alphas)
+
+  chainlen = nrow(alphas)/samp$chains
+  chain = factor(ceiling(1:nrow(alphas)/chainlen))
+
+  alphas =split(as.data.frame(alphas),chain)
+
+  alphas = lapply(alphas,coda::mcmc)
+  alphas = coda::as.mcmc.list(alphas)
+
+  res = do.call(rbind,coda::gelman.diag(alphas,
+                                        multivariate=FALSE,
+                                        autoburnin=TRUE))
+
+  return(res)
+
+}
+
 
 ###helper function for chain extraction
 extract = function(l,name,as.df=FALSE,span=NULL){
@@ -436,20 +504,12 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 #' samples=250,cores=4,chains=4)
 #'
 #' effectsobject = draw_effs(sampleobject)
-
+#'
+#' @export
 draw_effs = function(sampobj,
                         means=FALSE,
                         betas=FALSE,
                         tol=NULL){
-  #sampobj is an apcsamp object
-  #tol is a number under 1 that idientifies
-  #means True/False that indicates whether means should be used or if it should be mean centered
-  #bretas identifies whether to keep effect coding summaries
-  #how many posterior samples
-  #returns apceffects object
-
-  #tolerance is the inverse of the number of samples
-  #from sampobj
 
   require(dplyr)
 
@@ -590,7 +650,7 @@ draw_effs = function(sampobj,
 ###########
 #summary function for effects class
 
-#'@export
+#' @export
 summary.apcsamp = function(samp){
 
   ss=samp$summaries
@@ -646,7 +706,7 @@ colQuant = function(df,alpha=0.05){
 #################
 #plot apceffects object
 
-#'@export
+#' @export
 plot.apceffects = function(effectsobj,
                            alpha=0.05,
                            adj.se=TRUE){

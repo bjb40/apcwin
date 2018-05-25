@@ -67,10 +67,10 @@ data(apcsim)
 apcsim$c = apcsim$p-apcsim$a
 
 #this draws 2500 samples on 4 cores for 10000 model samples
-testsamp = apcsamp(dat=apcsim,
+testsamp = apcwin::apcsamp(dat=apcsim,
                    dv='y1',
                    method='ml',
-                   samples=5,
+                   samples=50,
                    cores=2)
 
 #this draws a posterior effect sample
