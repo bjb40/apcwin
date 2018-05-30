@@ -264,6 +264,24 @@ return(res)
 
 } #end draw chains
 
+#helper funciton to listwise delete --
+#can update to deal with missing data and controls later
+#designed for use with apcsamp
+checkdat = function(...){
+
+  dat = data.frame(dat[,c(dv,apc)])
+  comp = complete.cases(dat)
+
+  if(any(comp)){
+    cat('Deleting',sum(!comp), 'incomplete cases')
+    dat = dat[comp,]
+  }
+
+  return(dat)
+
+}
+
+
 
 #' A wrapper for "draw_chains" that will use multiple search chains in the algorithm.
 #'
@@ -291,6 +309,10 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
 
 
 require(parallel)
+
+#make sure data is in proper form, an listwise delete
+  dat = checkdat()
+
 
 times = Sys.time()
 

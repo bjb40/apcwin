@@ -73,6 +73,17 @@ testsamp = apcwin::apcsamp(dat=apcsim,
                    samples=50,
                    cores=2)
 
+###
+#tibble test
+library(tidyverse)
+tst = as_tibble(apcsim)
+
+tst2 = apcwin::apcsamp(dat=tst,
+                       dv='y1',
+                       method='ml',
+                       samples=10,
+                       cores=2)
+
 #this draws a posterior effect sample
 #it takes a "sample" object (calculated by apcsamp)
 testeff = draw_effs(testsamp,
