@@ -267,7 +267,7 @@ return(res)
 #helper funciton to listwise delete --
 #can update to deal with missing data and controls later
 #designed for use with apcsamp
-checkdat = function(...){
+checkdat = function(dat){
 
   dat = data.frame(dat[,c(dv,apc)])
   comp = complete.cases(dat)
@@ -311,7 +311,7 @@ apcsamp = function(dat,dv='y',apc=c('a','p','c'),
 require(parallel)
 
 #make sure data is in proper form, an listwise delete
-  dat = checkdat()
+  dat = checkdat(dat)
 
 
 times = Sys.time()
