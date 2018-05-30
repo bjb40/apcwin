@@ -388,7 +388,7 @@ times = Sys.time()
     #exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
     modsum[,paste0(i,'_bf')] =
       (modsum$bic - limits[[i]]$bic) / 2
-    modsum[,paste0(i,'_pfprime')] =
+    modsum[,paste0(i,'_bfprime')] =
       (modsum$bic_prime - limits[[i]]$bic_prime) / 2
   }
 
@@ -464,30 +464,36 @@ convergence.default = function(samp) {
 convergence.apcsamp = function(samp){
   require(coda)
 
-  d = samp[['apc']]
+#  d = samp[['apc']]
+  e = samp$summaries$aic
 
-  alphas = lapply(d,function(dims){
-    alph = as.data.frame(samp$alpha[[dims]])
-    colnames(alph) = paste0(dims,
-      unique(samp$data[,dims])[order(unique(samp$data[,dims]))])
-    return(alph)
-  })
+#  alphas = lapply(d,function(dims){
+#    alph = as.data.frame(samp$alpha[[dims]])
+#    colnames(alph) = paste0(dims,
+#      unique(samp$data[,dims])[order(unique(samp$data[,dims]))])
+#    return(alph)
+#  })
 
-  alphas = do.call(cbind,alphas)
-  nc = ncol(alphas)
+#  alphas = do.call(cbind,alphas)
+#  nc = ncol(alphas)
 
-  chainlen = nrow(alphas)/samp$chains
-  chain = factor(ceiling(1:nrow(alphas)/chainlen))
+#  chainlen = nrow(alphas)/samp$chains
+#  chain = factor(ceiling(1:nrow(alphas)/chainlen))
 
-  alphas =split(as.data.frame(alphas),chain)
+#  alphas =split(as.data.frame(alphas),chain)
+  aic = lapply(split(e, ceiling(seq_along(e)/samp$chains)),coda::mcmc)
 
-  alphas = lapply(alphas,coda::mcmc)
-  alphas = coda::as.mcmc.list(alphas)
+#  alphas = lapply(alphas,coda::mcmc)
+#  alphas = coda::as.mcmc.list(alphas)
 
-  res = do.call(rbind,coda::gelman.diag(alphas,
-                                        multivariate=FALSE,
-                                        autoburnin=TRUE))
+#  res = do.call(rbind,coda::gelman.diag(alphas,
+#                                        multivariate=FALSE,
+#                                        autoburnin=TRUE))
 
+  res = list(
+    geweke=pnorm(geweke.diag(aic)$z)*2,
+    rhat = gelman.diag(aic)$psrf[1]
+  )
   return(res)
 
 }
@@ -672,6 +678,15 @@ draw_effs = function(sampobj,
 ###########
 #summary function for effects class
 
+#helper function to build weights from bic or aic
+calcwt = function(vector){
+  #vector is of aic or bic
+  k=min(vector)
+  d=-.5*(vector-k)
+  return(exp(d)/sum(exp(d)))
+}
+
+
 #' @export
 summary.apcsamp = function(samp){
 
@@ -687,22 +702,55 @@ summary.apcsamp = function(samp){
 
   cat('\n\nBest-fitting from full APC\n')
   cat('BIC:\t',ss$bic[best])
+  cat('\nAIC:\t',ss$aic[best])
   cat('\nR-squared:\t',ss$r2[best])
 
   cat('\n\n\nMean Number Window Breaks:\n')
   print(apply(ss[,1:3],2,weighted.mean,w=ss$w))
 
-  cat('Summary for limit case of null effects:\n')
-  cat('BIC\n')
-  print(unlist(lapply(samp$limits,function(x) x$bic)))
-  cat('R-squared\n')
-  cat(unlist(lapply(samp$limits,function(x) x$r2)))
 
-  cat('\n\nBayes Factors\n')
-  bf = ss[best,c(8,10,12)]
-  print(bf)
-  cat('\n\nBayes Factor less than 6 indicates much better fit.',
-      'Lowest BIC is usually best fitting.')
+  aic=c(samp$limits$no_a$aic,
+        samp$limits$no_p$aic,
+        samp$limits$no_c$aic,
+        samp$summaries$aic)
+
+  bicp=c(samp$limits$no_a$bic_prime,
+        samp$limits$no_p$bic_prime,
+        samp$limits$no_c$bic_prime,
+        samp$summaries$bic_prime)
+
+  bic=c(samp$limits$no_a$bic,
+         samp$limits$no_p$bic,
+         samp$limits$no_c$bic,
+         samp$summaries$bic)
+
+  aic.wt = calcwt(aic)
+  bicp.wt = calcwt(bicp)
+  bic.wt = calcwt(bic)
+
+  conv = convergence(samp)
+
+  cat('\n\nConvergence Diagnostics for sampling step:\n')
+  cat('\n\tGewecke Diagnostic (p-value of convergence):\t',rnd(conv$geweke))
+  cat('\n\tR-Hat (a value of 1 indicates convergence):\t',rnd(conv$rhat))
+
+
+
+  cat('\n\nTest for null effects (assuming sufficient convergence):\n')
+  cat('Using AIC, the Posterior Probability of the following null models being "correct" i.e. minimizing AIC):',
+      '\n\tNo A effects:\t',rnd(aic.wt[1],3),
+      '\n\tNo P effects:\t',rnd(aic.wt[2],3),
+      '\n\tNo C effects:\t',rnd(aic.wt[3],3))
+  #cat('BIC\n')
+  #print(unlist(lapply(samp$limits,function(x) x$bic)))
+  #cat('R-squared\n')
+  #cat(unlist(lapply(samp$limits,function(x) x$r2)))
+
+  #cat('\n\nBayes Factors\n')
+  #bf = ss[best,c(8,10,12)]
+  #print(bf)
+  #cat('\n\nBayes Factor less than 6 indicates much better fit.',
+  #    'Lowest BIC is usually best fitting.')
 
 }
 
