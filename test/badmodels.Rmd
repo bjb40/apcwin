@@ -1,0 +1,114 @@
+---
+title: "Bad Models"
+author: "Bryce Bartlett"
+date: "May 31, 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(apcwin)
+library(tidyverse)
+library(knitr)
+```
+## Generating a Model Based on GSS
+
+I build the model based on a subset of the GSS (this was previously cleaned for another project---should update with full GSS).
+
+The generating formula is as follows:
+
+$$
+y = sin(p) + 0.1(c-1950) + \epsilon
+$$
+Where $p$ stands for period (survey year), $c$ stands for cohort (birth year), and the distribution of the error is standar normal ($\epsilon \sim N(0,1)$).
+
+```{r}
+dat <- read.csv("H:/projects/gender_egal/output/private~/subdat.csv") 
+
+dat = dat %>%
+  dplyr::rename(a=age,
+         p=year) %>%
+  dplyr::mutate(c = p-a,
+         y=sin(p)+(c-1950)*.01+rnorm(nrow(dat))) %>%
+  dplyr::select(a,p,c,y)
+```
+
+## The Stochastic Window Sampler Model
+
+I estimate effects using the stochastic window sampler model as follows, and output the summary results of the sample and estimated effects.
+
+```
+samp = apcsamp(dat = dat,
+        cores=3,
+        method='ml',
+        samples=100)
+
+print(summary(samp))
+
+effs = draw_effs(samp,tol=0.01)
+
+plot(effs)
+
+```
+
+This appears erroneous because the summary suggests that the best fitting model is one where the cohort dimension is deleted, and the three-dimensional model shows an effect for age. (There also appears to be a negative trend in the sine wave of the period effect).
+
+This are not truly errouneous for two reasons, however. First, because of the .
+
+## Exploring the True Model and Alternative Specifications.
+
+The codeblock below identifies three models: the true model, and the limit-case models with a deleted dimension using the block-modelling strategy, which treats each dimension as a unique factor variable.
+
+```{r}
+true.m = lm(y~I(sin(p))+I(c-1950),data=dat)
+noc.m = lm(y~factor(a)+factor(p),data=dat)
+noa.m = lm(y~factor(p)+factor(c),data=dat)
+
+kable(
+  data.frame(True=AIC(true.m),
+             c.excluded=AIC(noc.m),
+             a.excluded=AIC(noa.m)),
+  digits=2,
+  caption='AIC from various models specifications.'
+)
+
+```
+
+The lowest AIC is the true model, followed by the model deleting the cohort dimension, and finally, the model deleting age. Why is this the case? It is because we are expanding the "true" two-dimensional model across three dimensions. In this case, the models with a deleted dimension are simply transformations of very similar models (like a statistical Necker Cube). This shows that the transformation of cohort into age is better able to minimize variance (as measured by AIC).
+
+To make explicit that these are simply transformations of a three dimensional model, consider the following substitute transformations of the ture model:
+
+Substitute 1:
+
+$$
+y = 0 + 1[sin(c)cos(a) + cos(c)*sin(a)] + 0.1*(c-1950) + \epsilon
+$$
+
+Substitue 2:
+
+$$
+y = 0 + 1[sin(p)] + 0.1(p-a-1950) + \epsilon
+$$
+
+Substitute 3:
+
+$$
+\begin{align}
+y &= 1[sin(p)] + 0.1p - 0.1a - 0.1(1950) + \epsilon \\
+  &= -195 + 1[sin(p)] + 0.1p + -0.1a + \epsilon
+\end{align}
+$$
+
+We can run each of the models as follows:
+
+```{r}
+sub1.m = lm(y~I(sin(c)*cos(a)+cos(c)*sin(a))+I(c-1950),data=dat)
+sub2.m = lm(y~I(sin(p))+I(p-a-1950),data=dat)
+sub3.m = lm(y~I(sin(p))+p+a,data=dat)
+
+
+```
+(see https://brownmath.com/twt/sumdiff.htm#sincosAplusmnB
+for Trigonometric equivalencies)
