@@ -3,8 +3,8 @@ title: "Bad Models"
 author: "Bryce Bartlett"
 date: "May 31, 2018"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +22,7 @@ The generating formula is as follows:
 $$
 y = sin(p) + 0.1(c-1950) + \epsilon
 $$
-Where $p$ stands for period (survey year), $c$ stands for cohort (birth year), and the distribution of the error is standar normal ($\epsilon \sim N(0,1)$).
+Where $a$ stands for age, $p$ stands for period (survey year), $c$ stands for cohort (birth year), and the distribution of the error is standard normal ($\epsilon \sim N(0,1)$).
 
 ```{r}
 dat <- read.csv("H:/projects/gender_egal/output/private~/subdat.csv") 
@@ -39,7 +39,7 @@ dat = dat %>%
 
 I estimate effects using the stochastic window sampler model as follows, and output the summary results of the sample and estimated effects.
 
-```
+```{r}
 samp = apcsamp(dat = dat,
         cores=3,
         method='ml',
@@ -55,11 +55,11 @@ plot(effs)
 
 This appears erroneous because the summary suggests that the best fitting model is one where the cohort dimension is deleted, and the three-dimensional model shows an effect for age. (There also appears to be a negative trend in the sine wave of the period effect).
 
-This are not truly errouneous for two reasons, however. First, because of the .
+This are not truly erroneous for two reasons, however. First, because of the .
 
 ## Exploring the True Model and Alternative Specifications.
 
-The codeblock below identifies three models: the true model, and the limit-case models with a deleted dimension using the block-modelling strategy, which treats each dimension as a unique factor variable.
+The code block below identifies three models: the true model, and the limit-case models with a deleted dimension using the block-modelling strategy, which treats each dimension as a unique factor variable. These block models are the equivalencies that we test in the SWS.
 
 ```{r}
 true.m = lm(y~I(sin(p))+I(c-1950),data=dat)
@@ -76,30 +76,37 @@ kable(
 
 ```
 
+
 The lowest AIC is the true model, followed by the model deleting the cohort dimension, and finally, the model deleting age. Why is this the case? It is because we are expanding the "true" two-dimensional model across three dimensions. In this case, the models with a deleted dimension are simply transformations of very similar models (like a statistical Necker Cube). This shows that the transformation of cohort into age is better able to minimize variance (as measured by AIC).
 
-To make explicit that these are simply transformations of a three dimensional model, consider the following substitute transformations of the ture model:
+To make explicit that these are simply transformations of a three dimensional model, consider the following substitute transformations of the true model:
 
 Substitute 1:
 
 $$
-y = 0 + 1[sin(c)cos(a) + cos(c)*sin(a)] + 0.1*(c-1950) + \epsilon
+y = \beta_0 + \beta_1[sin(c)cos(a) + cos(c)*sin(a)] + \beta_2(c-1950) + \epsilon
 $$
 
-Substitue 2:
+As in the true model, the expected values of the estimates are $\beta_0 = 0$, $\beta_1 = 1$, and $\beta_2 = 0.1$
+
+Substitute 2:
 
 $$
-y = 0 + 1[sin(p)] + 0.1(p-a-1950) + \epsilon
+y = \beta_0 + \beta_1[sin(p)] + \beta_2(p-a-1950) + \epsilon
 $$
+
+If we distribute the estimate of $\beta_2$, we can get another substitute model:
 
 Substitute 3:
 
 $$
 \begin{align}
-y &= 1[sin(p)] + 0.1p - 0.1a - 0.1(1950) + \epsilon \\
-  &= -195 + 1[sin(p)] + 0.1p + -0.1a + \epsilon
+y &= \beta_0 + \beta_1[sin(p)] + beta_2p - \beta_2a - \beta_2(1950) + \epsilon \\
+  &= \beta_0^{\prime} + \beta_1[sin(p)] + \beta_2p + -\beta_2a + \epsilon
 \end{align}
 $$
+
+(Where $\beta_0^{\prime}$ is adjusted by a constant (negative) value from $\beta_0$).
 
 We can run each of the models as follows:
 
@@ -108,7 +115,72 @@ sub1.m = lm(y~I(sin(c)*cos(a)+cos(c)*sin(a))+I(c-1950),data=dat)
 sub2.m = lm(y~I(sin(p))+I(p-a-1950),data=dat)
 sub3.m = lm(y~I(sin(p))+p+a,data=dat)
 
+kable(
+  data.frame(True=AIC(true.m),
+             Substitute.1=AIC(sub1.m),
+             Substitute.2=AIC(sub2.m),
+             substitute.3=AIC(sub3.m)),
+  digits=2,
+  caption='AIC from various models specifications.'
+)
 
 ```
-(see https://brownmath.com/twt/sumdiff.htm#sincosAplusmnB
-for Trigonometric equivalencies)
+
+
+
+
+[Reference to trigonometric equivalencies.](https://brownmath.com/twt/sumdiff.htm#sincosAplusmnB)
+
+Substitute 1 and 2 are exactly equivalent. Substitute 3 is slightly different; in any case, the predicted estimates are accurate.
+
+
+```{r}
+
+kable(
+  data.frame(
+    True = c(coef(true.m),NA),
+    Substitute.1 = c(coef(sub1.m),NA),
+    Substitute.2 = c(coef(sub2.m),NA),
+    Substitute.3 = coef(sub3.m),
+    row.names=c('Beta0','Beta1','Beta2','Beta3 (equals -1*Beta2)')
+  ), 
+  digits=3,
+  caption='Estimated Coefficients from Substitute Models.'
+)
+
+```
+
+
+
+Substitute 3 is nearly identical to the true model (in terms of AIC, it is indistinguishable), but it is completely specified *without* a cohort dimension. In addition, the age coefficient is statistically significant (because in Substitute 3 it acts as a partial transformation of the cohort effect along with the period coefficient).
+
+```{r}
+library(stargazer)
+stargazer(list(true.m,sub3.m),type='text')
+```
+
+Theoretically, this should be a problem in all cases where social time has only two dimensions. Specifically, because our tools use three dimensions to measure time. Because of this, all two-dimensional models have infinitely-many nearly-equivalent substitutes, it is impossible to say which is the *true* model, because if social time is truly two-dimensional, then age, period, and cohort, do not exist as such, and we need to develop a two-dimensional concept to describe social time.
+
+Otherwise (as noted above) it is like a Necker cube, where there are multiple equivalent interpretations in three dimensions of the same two-dimensional object. The window sampler does not test all possible transformations of a, p, and c, but does test for the best transformation *within* the set of identified block models.
+
+Why does the SWS choose the "incorrect" dimension to delete. I'm not completely certain, but I think it has to do with the covariance of age, period, and cohort. In particular, for the GSS, age and cohort are very highly (and negatively) correlated (-0.85). Age is much less correlated with period than cohort, however. This means that substituting age for cohort may give better leverage, and in fact, as shown above, for the window sampler, does minimize AIC (meaning it gets better prediction).
+
+
+```{r}
+vars = dat %>%
+  dplyr::mutate(sinp = sin(p),
+         clim = c-1950) %>%
+  dplyr::select(sinp,clim,y,a,c,p)
+
+kable(
+  cor(vars,use='complete.obs'),
+  digits=2,
+  caption="Pearson correlations of variables and select transformations."
+)
+
+```
+
+
+Notably, the SWS correctly identified that time is more likely two-dimensional. The block model that minimizes AIC when all three dimensions are included is the most efficient model, using variable transformations under particular requirements.
+
+Because of this, I might delete the segment in the summary identifying which dimension to delete, and include instead a reference to a two-dimensional model. As it is, the returned model doesn't sample from the deleted dimension model, either. 

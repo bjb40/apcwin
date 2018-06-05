@@ -394,6 +394,7 @@ lin_ml = function(y,x){
 #Misc Functions/objects
 #@@@@@@@@@@@@@@@@@@@@@
 
+#' @export
 rnd = function(db,rd){
   # rounds input to preserve leading zeros
   #
@@ -409,6 +410,7 @@ rnd = function(db,rd){
   return(sprintf(rdl,round(db,digits=rd)))
 }
 
+#' @export
 sig = function(pv){
   # returns stars based on pvalue
   #

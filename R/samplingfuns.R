@@ -464,36 +464,26 @@ convergence.default = function(samp) {
 convergence.apcsamp = function(samp){
   require(coda)
 
-#  d = samp[['apc']]
   e = samp$summaries$aic
 
-#  alphas = lapply(d,function(dims){
-#    alph = as.data.frame(samp$alpha[[dims]])
-#    colnames(alph) = paste0(dims,
-#      unique(samp$data[,dims])[order(unique(samp$data[,dims]))])
-#    return(alph)
-#  })
+  chainlen = length(e)/samp$chains
+  aic = split(e, ceiling(seq_along(e)/chainlen))
+  aic = lapply(aic,coda::mcmc)
+  aic = coda::as.mcmc.list(aic)
 
-#  alphas = do.call(cbind,alphas)
-#  nc = ncol(alphas)
-
-#  chainlen = nrow(alphas)/samp$chains
-#  chain = factor(ceiling(1:nrow(alphas)/chainlen))
-
-#  alphas =split(as.data.frame(alphas),chain)
-  aic = lapply(split(e, ceiling(seq_along(e)/samp$chains)),coda::mcmc)
-
-#  alphas = lapply(alphas,coda::mcmc)
-#  alphas = coda::as.mcmc.list(alphas)
-
-#  res = do.call(rbind,coda::gelman.diag(alphas,
-#                                        multivariate=FALSE,
-#                                        autoburnin=TRUE))
-
+  geweke = geweke.diag(aic)
+  pv = data.frame(
+    zval=unlist(lapply(geweke,function(z) z$z)),
+    pv=unlist(lapply(geweke,function(z)
+      (1-pnorm(abs(z$z))*.5)))
+)
+  row.names(pv) = paste('Chain',1:nrow(pv))
   res = list(
-    geweke=pnorm(geweke.diag(aic)$z)*2,
-    rhat = gelman.diag(aic)$psrf[1]
+    geweke=pv,
+    rhat = gelman.diag(aic)$psrf[1],
+    size = effectiveSize(aic)
   )
+
   return(res)
 
 }
@@ -729,19 +719,19 @@ summary.apcsamp = function(samp){
   bic.wt = calcwt(bic)
 
   conv = convergence(samp)
+  gw = paste(apply(conv$geweke,2,rnd)[,'pv'],collapse=',')
 
   cat('\n\nConvergence Diagnostics for sampling step:\n')
-  cat('\n\tGewecke Diagnostic (p-value of convergence):\t',rnd(conv$geweke))
+  cat('\n\tGewecke Diagnostic (Bayesian p-value for convergence--0.5 is best; tail probabilities indicate nonconvergence):\t',gw)
   cat('\n\tR-Hat (a value of 1 indicates convergence):\t',rnd(conv$rhat))
 
 
 
   cat('\n\nTest for null effects (assuming sufficient convergence):\n')
-  cat('Using AIC, the Posterior Probability of the following null models being "correct" i.e. minimizing AIC):',
-      '\n\tNo A effects:\t',rnd(aic.wt[1],3),
-      '\n\tNo P effects:\t',rnd(aic.wt[2],3),
-      '\n\tNo C effects:\t',rnd(aic.wt[3],3))
-  #cat('BIC\n')
+  cat('Using AIC, the Posterior Probability of fewer than three dimensions (A,P, and C not all necessary):',
+      rnd(sum(aic.wt[1:3]),3))
+
+    #cat('BIC\n')
   #print(unlist(lapply(samp$limits,function(x) x$bic)))
   #cat('R-squared\n')
   #cat(unlist(lapply(samp$limits,function(x) x$r2)))
