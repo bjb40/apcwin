@@ -46,18 +46,34 @@ library(apcwin)
 data(apcsim)
 apcsim$c = apcsim$p-apcsim$a
 
-tst = draw_chains(y1~a+p+c,data=apcsim,windowvars=c('a','p'))
-#throws error!! -- need to fix for 1 dimensional!
-tst2 = draw_chains(y1~a+p,data=apcsim,windowvars='a')
-tst3 = draw_chains(y1~I(a) + I(a^2) + p +c,data=apcsim,windowvars=c('c','p'))
-#throws error!
-tst4 = draw_chains(y1~I(a) + I(a^2) + p +c,
-                   data=apcsim,windowvars=c('c','p'),
-                   method='gibbs')
+#need to fix potential inconsistency with chains&cores
+#the summaries are way messed up; probably "extract" methods
+tst1 = apcsamp(y1~a+p+c,data=apcsim,chains=3,
+               method='ml',cores=3,samples=10)
+
+tst2 = apcsamp(y1~a+p+c,chains=3,method='ml',cores=3,samples=10,
+              data=apcsim,windowvars=c('a','p'))
+
+tst3 = apcsamp(y1~a+p,chains=3,method='ml',
+                   cores=3,samples=10,data=apcsim,
+                   windowvars='a')
+
+tst4 = apcsamp(y1~a+I(a^2)+p+c,chains=3,method='ml',
+               cores=3,samples=10,data=apcsim,
+               windowvars=c('p','c'))
+
+tst5 = apcsamp(y1~a+I(a^2)+p+c,chains=3,method='gibbs',
+               cores=3,samples=10,draws=100,
+               data=apcsim,
+               windowvars=c('p','c'))
+
 
 
 tt.gibbs=draw_chains(dat,dv='egal',samples=3)
 tt.ml=draw_chains(dat,dv='egal',samples=3,method='ml')
+
+
+
 
 #short test
 chains=apcsamp(dat,dv='egal',method='ml',samples=3,cores=2)

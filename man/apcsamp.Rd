@@ -4,15 +4,15 @@
 \alias{apcsamp}
 \title{A wrapper for "draw_chains" that will use multiple search chains in the algorithm.}
 \usage{
-apcsamp(dat, dv = "y", apc = c("a", "p", "c"), cores = 1,
-  method = "gibbs", chains = 1, samples = 100, draws = 1000)
+apcsamp(formula, data, windowvars = c("a", "p", "c"), cores = 1,
+  method = "ml", chains = 1, samples = 100, draws = 1000)
 }
 \arguments{
-\item{dat}{A dataframe.}
+\item{formula}{A formula for a model.}
 
-\item{dv}{A character variable or column number indicating the dependent variable.}
+\item{data}{A dataframe.}
 
-\item{apc}{A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').}
+\item{windowvars}{A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c'). This can also be used to calculate window breaks for other sorts of continuous varaibles.}
 
 \item{cores}{Integer indicating cores to use.}
 

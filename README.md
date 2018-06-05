@@ -43,14 +43,15 @@ data(apcsim)
 apcsim$c = apcsim$p-apcsim$a
 
 #this draws 2500 samples on 4 cores for 10000 model samples
-testsamp = apcsamp(dat=apcsim,
-                   dv='y1',
+testsamp = apcsamp(y1~a+p+c,
+                   windowvars=c('a','p','c'),
+                   data=apcsim,
                    method='ml',
                    samples=2500,
                    cores=4)
 
 #this summarizes the results of the apc sampler
-summarize(testsamp)
+summary(testsamp)
 
 
 #this draws a posterior effect sample

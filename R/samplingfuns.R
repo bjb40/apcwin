@@ -259,30 +259,12 @@ return(res)
 
 } #end draw chains
 
-#helper funciton to listwise delete --
-#can update to deal with missing data and controls later
-#designed for use with apcsamp
-checkdat = function(dat,dv,apc){
-
-  dat = data.frame(dat[,c(dv,apc)])
-  comp = complete.cases(dat)
-
-  if(any(comp)){
-    cat('Deleting',sum(!comp), 'incomplete cases')
-    dat = dat[comp,]
-  }
-
-  return(dat)
-
-}
-
-
 
 #' A wrapper for "draw_chains" that will use multiple search chains in the algorithm.
 #'
-#' @param dat A dataframe.
-#' @param dv A character variable or column number indicating the dependent variable.
-#' @param apc A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').
+#' @param formula A formula for a model.
+#' @param data A dataframe.
+#' @param windowvars A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c'). This can also be used to calculate window breaks for other sorts of continuous varaibles.
 #' @param cores Integer indicating cores to use.
 #' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
 #' @param draws Integer indicating samples; used only for "gibbs" method.
@@ -298,33 +280,16 @@ checkdat = function(dat,dv,apc){
 #' apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
 #'
 #' @export
-apcsamp = function(dat,dv='y',apc=c('a','p','c'),
-                   cores=1,method='gibbs',
+apcsamp = function(formula,data,windowvars=c('a','p','c'),
+                   cores=1,method='ml',
                    chains=1,samples=100,draws=1000){
 
+  #make sure data is in proper form, an listwise delete
+  obs = nrow(data)
+  data = model.frame(formula,data)
+  cat('Deleting',obs-nrow(data),'incomplete observations.\n')
 
-require(parallel)
-
-#make sure data is in proper form, an listwise delete
-  dat = checkdat(dat,dv,apc)
-
-
-times = Sys.time()
-
-  #generate limit cases for deleted cases
-  limits = list()
-  for(i in seq_along(apc)){
-      vec = apc[1:3 != i]
-
-      y = dat[,dv]
-      x = as.data.frame(apply(dat[,vec],2,as.factor))
-      xmat = model.matrix(~., data = x)
-
-      limits[[i]] = lin_ml(y,xmat)
-
-  }
-
-  names(limits) = paste0('no_',apc)
+  times = Sys.time()
 
 
   #create holder environment for shared variables
@@ -333,9 +298,9 @@ times = Sys.time()
   #assign to environemnt to pass to clusters
   #assign to environemnt to pass to clusters
   assign('args',list(
-    dat=dat,
-    dv=dv,
-    apc=apc,
+    data=data,
+    formula=formula,
+    windowvars=windowvars,
     method=method,
     samples=samples,
     draws=draws
@@ -363,9 +328,9 @@ times = Sys.time()
   chains=parallel::parLapply(cl=cl,1:cores,function(...){
     args=get('args',env=par)
     require(apcwin)
-    draw_chains(dat=args$dat,
-                dv=args$dv,
-                apc=args$apc,
+    draw_chains(data=args$data,
+                formula=args$formula,
+                windowvars=args$windowvars,
                 method=args$method,
                 samples=args$samples,
                 draws=args$draws)
@@ -376,16 +341,8 @@ times = Sys.time()
   cat('\n\nEnd drawing chains...')
   parallel::stopCluster(cl)
 
+  #need to fix when windowvars is 1 dimensional
   modsum = extract(chains,'modsum', as.df=TRUE)
-
-  #check against limits
-  for(i in names(limits)){
-    #exp((modsum[s,'bic']-modsum[s-1,'bic'])/2)
-    modsum[,paste0(i,'_bf')] =
-      (modsum$bic - limits[[i]]$bic) / 2
-    modsum[,paste0(i,'_bfprime')] =
-      (modsum$bic_prime - limits[[i]]$bic_prime) / 2
-  }
 
   #calculate weight by bic and bic_prime
   #https://stats.stackexchange.com/questions/249888/use-bic-or-aic-as-approximation-for-bayesian-model-averaging
@@ -399,33 +356,23 @@ times = Sys.time()
 
   t.samples = sum(extract(chains,'n.samples'))
 
-  breaks = list(
-    a=do.call(c,lapply(chains,function(x)
-      x[['breaks']][['a']])),
-    p=do.call(c,lapply(chains,function(x)
-      x[['breaks']][['p']])),
-    c=do.call(c,lapply(chains,function(x)
-      x[['breaks']][['c']]))
-  )
-
-  alphas = list(
-    a = do.call(rbind,lapply(chains, function(x)
-      x[['alphas']][['a']])),
-    p = do.call(rbind,lapply(chains,function(x)
-      x[['alphas']][['p']])),
-    c = do.call(rbind,lapply(chains,function(x)
-      x[['alphas']][['c']]))
-  )
-
+  #need to fix breaks and alphas
+  breaks = list()
+  alphas=list()
+  for(i in windowvars){
+    breaks[[i]] = do.call(c,lapply(chains,function(j)
+      j[['breaks']][[i]]))
+    alphas[[i]] = do.call(rbind,lapply(chains,function(j)
+      j[['alphas']][[i]]))
+  }
 
   fullt = Sys.time() - times
 
   res = list(
-  data = dat,
-  apc = apc,
-  dv = dv,
+  data = data,
+  windowvars = windowvars,
+  formula = formula,
   alphas = alphas,
-  limits = limits,
   summaries = cbind(
     extract(chains,'win',as.df=TRUE),
             modsum),
@@ -437,6 +384,9 @@ times = Sys.time()
   method = extract(chains,'method'),
   timespent = fullt)
 
+  if(length(windowvars)==1){
+    colnames(res$summaries)[1] = windowvars
+  }
   class(res) = append(class(res),'apcsamp')
 
   return(res)
@@ -492,7 +442,7 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 
   res=do.call(base::c,lapply(l,function(x) x[[name]][span]))
   if(as.df){
-    res=do.call(rbind,lapply(l,function(x) x[[name]]))
+    res=do.call(rbind,lapply(l,function(x) as.data.frame(x[[name]])))
   }
 
   return(res)
@@ -685,33 +635,14 @@ summary.apcsamp = function(samp){
       '\tBoundary Faults:',samp$bound)
 
 
-  cat('\n\nBest-fitting from full APC\n')
-  cat('BIC:\t',ss$bic[best])
-  cat('\nAIC:\t',ss$aic[best])
-  cat('\nR-squared:\t',ss$r2[best])
+  cat('\n\nModel fit details.\n')
+  cat('BIC:\t',weighted.mean(ss$bic,w=ss$w))
+  cat('\nAIC:\t',weighted.mean(ss$aic,w=ss$w))
+  cat('\nR-squared:\t',weighted.mean(ss$r2,w=ss$w))
 
   cat('\n\n\nMean Number Window Breaks:\n')
-  print(apply(ss[,1:3],2,weighted.mean,w=ss$w))
+  print(apply(ss[,samp$windowvars],2,weighted.mean,w=ss$w))
 
-
-  aic=c(samp$limits$no_a$aic,
-        samp$limits$no_p$aic,
-        samp$limits$no_c$aic,
-        samp$summaries$aic)
-
-  bicp=c(samp$limits$no_a$bic_prime,
-        samp$limits$no_p$bic_prime,
-        samp$limits$no_c$bic_prime,
-        samp$summaries$bic_prime)
-
-  bic=c(samp$limits$no_a$bic,
-         samp$limits$no_p$bic,
-         samp$limits$no_c$bic,
-         samp$summaries$bic)
-
-  aic.wt = calcwt(aic)
-  bicp.wt = calcwt(bicp)
-  bic.wt = calcwt(bic)
 
   conv = convergence(samp)
   gw = paste(apply(conv$geweke,2,rnd)[,'pv'],collapse=',')
@@ -719,23 +650,6 @@ summary.apcsamp = function(samp){
   cat('\n\nConvergence Diagnostics for sampling step:\n')
   cat('\n\tGewecke Diagnostic (Bayesian p-value for convergence--0.5 is best; tail probabilities indicate nonconvergence):\t',gw)
   cat('\n\tR-Hat (a value of 1 indicates convergence):\t',rnd(conv$rhat))
-
-
-
-  cat('\n\nTest for null effects (assuming sufficient convergence):\n')
-  cat('Using AIC, the Posterior Probability of fewer than three dimensions (A,P, and C not all necessary):',
-      rnd(sum(aic.wt[1:3]),3))
-
-    #cat('BIC\n')
-  #print(unlist(lapply(samp$limits,function(x) x$bic)))
-  #cat('R-squared\n')
-  #cat(unlist(lapply(samp$limits,function(x) x$r2)))
-
-  #cat('\n\nBayes Factors\n')
-  #bf = ss[best,c(8,10,12)]
-  #print(bf)
-  #cat('\n\nBayes Factor less than 6 indicates much better fit.',
-  #    'Lowest BIC is usually best fitting.')
 
 }
 
