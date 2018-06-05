@@ -3,9 +3,7 @@
 #Bryce Bartlett
 
 #' @export
-window.sample=function(var,alph){
-  require(MCMCpack)
-
+window_sample=function(var,alph){
   #input is continuous of a,p,c
   #alpha is a vector the length of unique entries in var that is fed to dirichelet
   #output is factor with uniform, random window constraints
@@ -15,7 +13,7 @@ window.sample=function(var,alph){
 
   alph=unlist(alph)
 
-  dp=rdirichlet(1,alph)
+  dp=MCMCpack::rdirichlet(1,alph)
   #segment the stick
   segments=round(cumsum(dp*len))
   #identify changes in segments
@@ -56,7 +54,9 @@ window.sample=function(var,alph){
 #' @examples
 #' data(apcsamp)
 #' draw_chains(apcsamp,method='ml',samples=250,cores=4,chains=4)
-draw_chains = function(dat,dv='y',apc=c('a','p','c'),
+draw_chains = function(dat,
+                       dv='y',
+                       apc=c('a','p','c'),
                        cores=1,
                        method='gibbs',
                        chains=1,
@@ -176,9 +176,9 @@ for(s in 2:(n.samples+1)){
   }
 
   #draw random window samples
-  x$a=window.sample(x$a,all.alphas$a[s,])
-  x$p=window.sample(x$p,all.alphas$p[s,])
-  x$c=window.sample(x$c,all.alphas$c[s,])
+  x$a=window_sample(x$a,all.alphas$a[s,])
+  x$p=window_sample(x$p,all.alphas$p[s,])
+  x$c=window_sample(x$c,all.alphas$c[s,])
 
   #collect model data
   nr=data.frame(a=length(levels(x$a)),

@@ -1,5 +1,6 @@
 ####
-#collecting effects operations
+#these functions return operations on the objects defined
+#in samplingfuns
 
 #' @export
 delt = function(effectsobj){
@@ -47,4 +48,9 @@ tstdiff = function(effectsobj){
 
   names(diff) = names(effectsobj$effects)
   return(diff)
+}
+
+#' @export
+export_breaks = function(effobj){
+  print('TB coded')
 }

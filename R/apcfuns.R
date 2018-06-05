@@ -1,14 +1,5 @@
-#Dev R 3.3.0 "Supposedly Educational"
 #general functions for apc project
-#
-#Bryce Bartlett
 
-#make an S3 object:
-#http://www.cyclismo.org/tutorial/R/s3Classes.html#memory-management
-
-#print_current = function(){
-#  print('\nmemoryfix branch')
-#}
 
 #' @export
 window = function(var,winlength,breaks){
@@ -29,13 +20,10 @@ window = function(var,winlength,breaks){
   } else{nobreak=FALSE}
 
   if(nobreak & is.na(winlength)){
-    stop("
+    stop('
 Must specify either a window length (winlength)
-or vector of breaks (breaks -- works like base cut)")
+or vector of breaks (breaks -- works like "cut" in base R.)')
   }
-
-  #consider warning for small cell values
-  #consider error for out-of-range window or break sets
 
   r=range(var)
 
@@ -56,7 +44,6 @@ if(!is.na(winlength)){
   c=cut(var,breaks=breaks)
   attr(c,'range') = r
   attr(c,'breaks') = breaks
-  #inherit the name???
 
   class(c) = append(class(c),'window')
 
@@ -133,185 +120,25 @@ expand.window=function(w){
   return(r[1]:r[2])
 }
 
-#ols funciton for estimating an apc model
-apc_lm = function(formula,data,age,per,coh,windows) {
-  #runs a linear model on an apc problem (need to id window)
-  #
-  # Inputs
-  #  formula=r formula object
-  #  data = dataframe
-  #  age,per,coh = named columns of dataframe for age, period, cohort
-  #  need only specify 2... If all 3 are specified, model checks for
-  #  linear dependence
-  #  windows = list identifying window constraints across apc
-  #            if empty, will pick random windows min=3,max=max(variable))
-  #
-  # Output
-  #   list including
-  #   (1) effects =  ols estimates from window model
-  #   (2) smallblock = block APC estimates
-  #   (3) linear = linearlized block estimates (cubic)
-
-  #@@@@
-  #input checks
-  no.age=no.period=no.cohort=FALSE
-
-  if(missing(age)){
-    no.age=TRUE
-    age='age'
-  }
-  if(missing(per)){
-    no.period=TRUE
-    per='period'
-  }
-  if(missing(coh)){
-    no.cohort=TRUE
-    coh='cohort'
-  }
-
-  if(sum(no.period,no.cohort,no.age)>1){
-    stop('Must specify 2 of 3 required estimates: age, period, or cohort.')
-  } else if(no.age){
-      data[,age]=data[,per]-data[,coh]
-  } else if(no.period){
-      data[,per]=data[,age]+data[,coh]
-  } else if(no.cohort){
-      data[,coh]=data[,per]-data[,age]
-  }
-
-  #@@@@
-  #window check
-  if(missing(windows)){
-    windows=list(age=0,period=0,cohort=0)
-
-    #id maximum window for constraint(min is 3)
-    max_w=function(var){
-      r=range(var)
-      return(r[2]-r[1])
-      }
-    windows$age=round(runif(1,3,max_w(data[,age])))
-    windows$period=round(runif(1,3,max_w(data[,per])))
-    windows$cohort=round(runif(1,3,max_w(data[,coh])))
-
-  }
-
-  #@@@@
-  #build model matrix from window constraints
-  wins=list(
-    a=window(data[,age],winlength=windows$age),
-    p=window(data[,per],winlength=windows$period),
-    c=window(data[,coh],winlength=windows$cohort)
-  )
-
-
-  ndat=data[,!colnames(data) %in% c(age,per,coh)]
-  ndat=cbind(ndat,wins$a,wins$p,wins$c)
-  colnames(ndat)[-1:(3-ncol(ndat))] = c(age,per,coh)
-
-  blockdat=lapply(wins,scopedummy);
-  names(blockdat)=c(age,per,coh)
-
-  #@@@@
-  #estimate OLS model based on window constraints
-
-  results=lm(formula,data=ndat)
-
-  #@@@@
-  #prepare small block estimates
-
-  b=coefficients(results)
-  cov=vcov(results)
-
-  predat=lapply(blockdat,FUN=function(x)
-    model.matrix(~.,data=as.data.frame(x)))
-
-  blockeff=list(beta=list(),cov=list())
-  predict=list(est=list(),cov=list())
-  beta.hat=list()
-
-  for(eff in c(age,per,coh)){
-     blockeff[['beta']][[eff]] = b [grepl(paste0(eff,'|Intercept'),names(b))]
-     blockeff[['cov']][[eff]] = cov[grepl(paste0(eff,'|Intercept'),rownames(cov)),
-            grepl(paste0(eff,'|Intercept'),colnames(cov))]
-
-  predict[['est']][[eff]]=predat[[eff]] %*% blockeff[['beta']][[eff]]
-
-  #this is _assuming_ at default (left out) variables
-  #should re-estimate based on means??
-
-  predict[['cov']][[eff]] = predat[[eff]] %*% blockeff[['cov']][[eff]] %*% t(predat[[eff]])
-
-  beta.hat[[eff]] = data.frame(cohort=expand(ndat[,eff]),
-                        est=predict[['est']][[eff]],
-                        se=sqrt(diag(predict[['cov']][[eff]])))
-  }
-
-
-
-
-  #@@@@
-  #prepare linear estimates(cubic)
-
-  #@@@@
-  #return
-
-  return(
-    list(
-      newdat=ndat,
-      results=results,
-      block.eff=beta.hat
-    )
-  )
-
-}
-
-plt = function(ols,varnames){
-  #this function takes a,p,c measures
-  #and plots them in a panel of 3
-  #dependency -- ggplot2 (can remove for package)
-  #
-  #Input:
-  #     ols=lm object
-  #     varnames=charater vector (1-3) identifying
-  #     variablenames for age period and cohort (in that order)
-  #     This will work for prefixes...
-  #
-  #Output: list of ggplot objects
-
-  #select coefficients from
-  b = coefficients(ols)
-
-  return(b)
-
-}
-
-
 ##############
 #gibbs sampler
 ###############
 
 #' @export
 lin_gibbs = function(y,x,iter=1000){
-  #iter = 1000
-
   rmse=ll=r2=s2=matrix(1,iter)
   b= matrix(0,iter,ncol(x))
-  #ytilde=yhat=matrix(0,iter,length(y))
   xtxi = solve(t(x)%*%x,tol=1e-22)
-  m=lm(y~x-1) #no intercept because i feed it one n the x matrix
+  #note: no intercept because i feed it one n the x matrix
+  m=lm(y~x-1)
   pars=coefficients(m)
   res=residuals(m)
   n=length(y)
 
   #simulate sigma from inverse gamma marginal
-  #original (why 0.5?): s2 = 1/rgamma(iter,nrow(x)-ncol(x)/2,.5*t(res)%*%res)
   s2 = sqrt(1/rgamma(iter,nrow(x)-ncol(x)/2,t(res)%*%res))
 
-  #set ppd
-  ppd = matrix(0,iter,length(y))
-
   for (i in 1:iter){
-    #print(i)
     #simulate beta from mvn
     b[i,]=pars+t(rnorm(length(pars),mean=0,sd=1))%*%chol(s2[i]*xtxi)
     yhat = x %*% b[i,]
@@ -324,28 +151,23 @@ lin_gibbs = function(y,x,iter=1000){
 
   colnames(b) = colnames(x)
   ###BIC estimate for Bayes Factor (posterior probability weight)
+  #calculations based on Rafferty 1995 (SMR)
   #p. 135 explains the differnce between bic and bic_prime
   #bic is "overall model fit" where
   #bic prime "provides an assessment of whether the model is explaining enough
   #variation to justify the number of parameters it's using..."
-  ###p. 135, Eq. 26 from Rafferty 1995 (SMR)
+  ###p. 135, Eq. 26
 
   bic_prime=n*log(1-mean(r2))+(ncol(x)-1)*log(n)
   #bic equation ...eq 23 http://www.stat.washington.edu/raftery/Research/PDF/kass1995.pdf
   bic=-2*mean(ll)+log(n)*ncol(x)
   aic=-2*mean(ll)+2*ncol(x)
 
-  #print(dim(yhat))
-
-  #sigma is poorly named
   return(list(betas=b,
               y=y,
               x=x,
-              #yhat=yhat,
               sigma=s2,
-              #ytilde=yhat+rnorm(length(yhat),mean=0,sd=s2),
               r2=r2,
-              #rmse=rmse,
               bic=bic,
               aic=aic,
               bic_prime=bic_prime,
@@ -380,9 +202,7 @@ lin_ml = function(y,x){
               sse=sum(residuals(m)^2),
               rank = m$rank,
               sigma=s2,
-              #ytilde=yhat+rnorm(length(yhat),mean=0,sd=s2),
               r2=r2,
-              #rmse=rmse,
               bic=bic,
               aic=aic,
               bic_prime=bic_prime,

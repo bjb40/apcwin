@@ -71,7 +71,7 @@ testsamp = apcwin::apcsamp(dat=apcsim,
                    dv='y1',
                    method='ml',
                    samples=50,
-                   cores=2)
+                   cores=3)
 
 ###
 #tibble test
