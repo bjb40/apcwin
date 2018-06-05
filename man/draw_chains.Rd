@@ -4,16 +4,16 @@
 \alias{draw_chains}
 \title{Draw a single chain.}
 \usage{
-draw_chains(dat, dv = "y", apc = c("a", "p", "c"), cores = 1,
-  method = "gibbs", chains = 1, samples = 10, draws = 1000,
+draw_chains(formula, data, windowvars = c("a", "p", "c"), cores = 1,
+  method = "ml", chains = 1, samples = 10, draws = 1000,
   startvals = NULL)
 }
 \arguments{
-\item{dat}{A dataframe.}
+\item{formula}{A formula object.}
 
-\item{dv}{A character variable or column number indicating the dependent variable.}
+\item{data}{A dataframe.}
 
-\item{apc}{A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').}
+\item{windowvars}{A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c'). This can also be used to calculate breaks for other sorts of variables.}
 
 \item{cores}{Integer indicating cores to use.}
 
@@ -23,7 +23,7 @@ draw_chains(dat, dv = "y", apc = c("a", "p", "c"), cores = 1,
 
 \item{draws}{Integer indicating the number of models to sample in the chain.}
 
-\item{starvals}{Optional list for chain starting values.}
+\item{startvals}{Optional list for chain starting values.}
 }
 \value{
 An object of apcsamp.

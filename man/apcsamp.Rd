@@ -18,9 +18,9 @@ apcsamp(dat, dv = "y", apc = c("a", "p", "c"), cores = 1,
 
 \item{method}{One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.}
 
-\item{samples}{Integer indicating samples; used only for "gibbs" method.}
+\item{samples}{Integer indicating the number of models to sample in the chain.}
 
-\item{draws}{Integer indicating the number of models to sample in the chain.}
+\item{draws}{Integer indicating samples; used only for "gibbs" method.}
 
 \item{startvals}{Optional list for chain starting values.}
 }

@@ -42,6 +42,20 @@ mgb = lin_gibbs(y=dat$egal,
 #######
 #testing functions
 
+library(apcwin)
+data(apcsim)
+apcsim$c = apcsim$p-apcsim$a
+
+tst = draw_chains(y1~a+p+c,data=apcsim,windowvars=c('a','p'))
+#throws error!! -- need to fix for 1 dimensional!
+tst2 = draw_chains(y1~a+p,data=apcsim,windowvars='a')
+tst3 = draw_chains(y1~I(a) + I(a^2) + p +c,data=apcsim,windowvars=c('c','p'))
+#throws error!
+tst4 = draw_chains(y1~I(a) + I(a^2) + p +c,
+                   data=apcsim,windowvars=c('c','p'),
+                   method='gibbs')
+
+
 tt.gibbs=draw_chains(dat,dv='egal',samples=3)
 tt.ml=draw_chains(dat,dv='egal',samples=3,method='ml')
 

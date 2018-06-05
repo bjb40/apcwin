@@ -42,69 +42,73 @@ window_sample=function(var,alph){
 
 #' Draw a single chain.
 #'
-#' @param dat A dataframe.
-#' @param dv A character variable or column number indicating the dependent variable.
-#' @param apc A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').
+#' @param formula A formula object.
+#' @param data A dataframe.
+#' @param windowvars A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c'). This can also be used to calculate breaks for other sorts of variables.
 #' @param cores Integer indicating cores to use.
 #' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
 #' @param samples Integer indicating samples; used only for "gibbs" method.
 #' @param draws Integer indicating the number of models to sample in the chain.
-#' @param starvals Optional list for chain starting values.
+#' @param startvals Optional list for chain starting values.
 #' @return An object of apcsamp.
 #' @examples
 #' data(apcsamp)
 #' draw_chains(apcsamp,method='ml',samples=250,cores=4,chains=4)
-draw_chains = function(dat,
-                       dv='y',
-                       apc=c('a','p','c'),
+#' @export
+draw_chains = function(formula,
+                       data,
+                       windowvars=c('a','p','c'),
                        cores=1,
-                       method='gibbs',
+                       method='ml',
                        chains=1,
                        samples=10,
                        draws=1000,
                        startvals=NULL){
 
-  y = dat[,dv]
-  effects=xhats=ppd=list()
+  #set up data
+  frame = model.frame(formula,data)
+  y = model.response(frame)
+
   tm=Sys.time()
   avtm=0
 
-dat$a = dat[,apc[1]]
-dat$p = dat[,apc[2]]
-dat$c = dat[,apc[3]]
+  #set of numbers of random samples
+  n.samples=samples
 
-#set of numbers of random samples
-n.samples=samples
+  #holder df for model summary data
+  win = data.frame(matrix(vector(), 0, length(windowvars),
+                  dimnames=list(c(), windowvars)),
+                  stringsAsFactors=FALSE)
+  #generate holder data
+  win[1,] = NA
 
-#holder df for model summary data
-win = data.frame(a=as.numeric(NA),
-                 p=as.numeric(NA),
-                 c=as.numeric(NA))
+  modsum = data.frame( r2=as.numeric(NA),
+                       sigma=as.numeric(NA),
+                       bic=as.numeric(NA),
+                       aic=as.numeric(NA),
+                       bic_prime=as.numeric(NA))
 
-modsum = data.frame( r2=as.numeric(NA),
-                     #sse = as.numeric(NA),
-                     #rank = as.numeric(NA),
-                     #n=nrow(dat),
-                     sigma=as.numeric(NA),
-                     bic=as.numeric(NA),
-                     aic=as.numeric(NA),
-                     bic_prime=as.numeric(NA))
+  breaks=lapply(as.list(win),list)
 
-breaks=list(a=list(),p=list(),c=list())
+  #calculate length of variables
+  if(length(windowvars)==1){
+    windat = as.data.frame(data[,windowvars])
+    colnames(windat) = windowvars
+  } else {
+    windat = data[,windowvars]
+  }
 
-d = c('a','p','c')
-dl = c(length(unique(dat$a)),
-       length(unique(dat$p)),
-       length(unique(dat$c)))
-names(dl) = d
+  dl = apply(windat,2,function(x)
+    length(unique(x)))
 
-#set starting values
-#use ratio of a/number of windows; sample a
-
-  all.alphas = lapply(d,function(x)
-    data.frame(t(rep(dl[x]/dl[x],length(unique(dat[,x]))))))
-
-  names(all.alphas) = d #names(all.nwins) = d
+  #generate dataframe to hold hyperparameters
+  all.alphas = lapply(names(dl),function(x)
+    as.data.frame(
+      matrix(rep(1,dl[x]),
+             1,dl[x],
+             dimnames=list(c(),paste0(x,'.',1:dl[x])))
+    ))
+  names(all.alphas) = names(dl)
 
 if(!is.null(startvals)){
   svals = unlist(lapply(startvals,length))
@@ -122,17 +126,16 @@ if(!is.null(startvals)){
 
 }
 
-#accept rate
-acc=0
-#count boundary conditions rejections
-bound=0
+  #accept rate
+  acc=0
+  #count boundary conditions rejections
+  bound=0
 
 #mcmc sampler (prior model probabilities are equal)
 for(s in 2:(n.samples+1)){
 
-  #print(s)
-  #reset dataframe
-  x=dat[,c('a','p','c')]
+  #reset model frame
+  frame = model.frame(formula,data)
 
   #draw numerator for nwindows sd =0.5
   #divide by nwindows
@@ -150,69 +153,61 @@ for(s in 2:(n.samples+1)){
 
     bound=bound+1
     out.al=sum(unlist(all.alphas)<0)
-    #out.wi=sum(unlist(all.nwins)<2)
-    #print(c(out.al,out.wi))
-    #s=s-1
-    #mnum=mnum-1 #should consolidate these
-    #cat('\n\nOut-of-Sample-Space Warning.\n\n')
-    #acc=acc-1
+
     for(d in seq_along(all.alphas)){
-      #all.nwins[[d]][s]=all.nwins[[d]][s-1]
       all.alphas[[d]][s,]=all.alphas[[d]][s-1,]
-      #note that this samples different windows with same hyper param
     }
 
   }
 
-  #skip if unideintified
-  la = length(levels(x$a)) == length(unique(dat$a))
-  lp = length(levels(x$p)) == length(unique(dat$p))
-  lc = length(levels(x$c)) == length(unique(dat$c))
-  if(all(la,lp,lc)){
+  #draw random window samples across windowvars
+  for(d in windowvars){
+   frame[,d] <- window_sample(frame[,d],
+                              all.alphas[[d]][s,])
+  }
+
+  x = model.matrix(formula,frame)
+
+  #check whether (t(x) %*% x )' is singular
+  identified = class(try(solve(t(x)%*%x),silent=TRUE))=='matrix'
+
+  if(!identified){
+    bound=bound+1
+
     for(d in seq_along(all.alphas)){
-      #all.nwins[[d]][s]=all.nwins[[d]][s-1]
       all.alphas[[d]][s,]=all.alphas[[d]][s-1,]
     }
   }
-
-  #draw random window samples
-  x$a=window_sample(x$a,all.alphas$a[s,])
-  x$p=window_sample(x$p,all.alphas$p[s,])
-  x$c=window_sample(x$c,all.alphas$c[s,])
 
   #collect model data
-  nr=data.frame(a=length(levels(x$a)),
-                p=length(levels(x$p)),
-                c=length(levels(x$c)))
-  win=rbind(win,nr)
+  if(length(windowvars)==1){
+    winframe = as.data.frame(frame[,windowvars])
+    colnames(winframe) = windowvars
+  } else {
+    winframe = frame[,windowvars]
+  }
 
-  #collect breaks data
-  breaks$a[[s]]=attr(x$a,'breaks')
-  breaks$p[[s]]=attr(x$p,'breaks')
-  breaks$c[[s]]=attr(x$c,'breaks')
+  br = lapply(winframe,function(i)
+    attr(i,'breaks'))
+
+  for(i in windowvars){
+    breaks[[i]][[s]]=br[[i]]
+  }
+
+  #number of factors is the number of breaks - 1 as described
+  #in paper describing model-space "G"
+  win = rbind(win,as.data.frame(lapply(br,length))-1)
 
   #add esitmate
   mnum = s
 
-  #reassign random references to each vector
-  a.lev=length(levels(x$a)); a.b = sample(1:a.lev,1)
-  p.lev=length(levels(x$p)); p.b = sample(1:p.lev,1)
-  c.lev=length(levels(x$c)); c.b = sample(1:c.lev,1)
-
-  form.c = as.formula(paste("~C(a,contr.treatment(a.lev,base=a.b))+
-                            C(p,contr.treatment(p.lev,base=p.b))+
-                            C(c,contr.treatment(c.lev,base=c.b))"))
-
-
-
-  #generate model matrix
-  xmat = model.matrix(form.c,data=x)
-
   m= NULL
   if(method=='gibbs'){
-    m = lin_gibbs(y=y,x=xmat)
+    m = lin_gibbs(y=y,x=x,iter=draws)
+    #generate means from draws
+    m$sigma = mean(m$sigma);m$r2=mean(m$r2)
   } else if(method=='ml'){
-    m = lin_ml(y=y,x=xmat)
+    m = lin_ml(y=y,x=x)
   }
 
   modsum = rbind(modsum,
@@ -290,8 +285,8 @@ checkdat = function(dat,dv,apc){
 #' @param apc A character vector naming the age, period, and cohort variables (defaults to 'a', 'p', and 'c').
 #' @param cores Integer indicating cores to use.
 #' @param method One of "gibbs" or "ml". For a fully bayesian estimator for a faster approximation.
-#' @param samples Integer indicating samples; used only for "gibbs" method.
-#' @param draws Integer indicating the number of models to sample in the chain.
+#' @param draws Integer indicating samples; used only for "gibbs" method.
+#' @param samples Integer indicating the number of models to sample in the chain.
 #' @param startvals Optional list for chain starting values.
 #'
 #' @details what does this look like.
