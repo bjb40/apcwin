@@ -31,3 +31,5 @@ print(deltas[[1]])
 #at the specified sensitivity (measured as a p-value of differneces)
 newdata = modeled_windows(testeff,pval=0.1)
 
+#new model
+summary(lm(y1~Age + I(Age^2) +Period.win+Cohort.win,data=newdata))
