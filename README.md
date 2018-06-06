@@ -37,30 +37,35 @@ This following codeblock uses simulated data to illustrate the arguments. This r
 ```
 ###
 #load test data
-#Note, you need to name your variables
-#as follows a = age, p = period, and c= cohort
 data(apcsim)
 apcsim$c = apcsim$p-apcsim$a
 
-#this draws 2500 samples on 4 cores for 10000 model samples
+#this draws 100 samples on 4 cores for 400 model samples
 testsamp = apcsamp(y1~a+p+c,
                    windowvars=c('a','p','c'),
                    data=apcsim,
                    method='ml',
-                   samples=2500,
+                   samples=100,
                    cores=4)
 
 #this summarizes the results of the apc sampler
 summary(testsamp)
 
-
-#this draws a posterior effect sample
-#it takes a "sample" object (calculated by apcsamp)
+#this estimates effects from the sampled models
 testeff = draw_effs(testsamp,
-                    tol=0.001)
+                    tol=0.01)
 
-#this plots the results of the dimensions
-plot(testeff,alpha=0.05)
+#this plots the window breaks, relative to the grand mean
+plot(testeff)
+
+#this tests the equality of contiguous values
+deltas = tstdiff(testeff)
+print(deltas[[1]])
+
+#this returns a new data-frame with implied winow constraints
+#at the specified sensitivity (measured as a p-value of differneces)
+newdata = modeled_windows(testeff,pval=0.1)
+
 ```
 
 

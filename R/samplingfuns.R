@@ -678,8 +678,8 @@ plot.apceffects = function(effectsobj,
   #need to add a ci
   #alpha is % level (two-tail)
   #adj.se adjusts ll and ul using mean level window breaks
-  require(ggplot2)
-  require(dplyr)
+  #require(ggplot2)
+  #require(dplyr)
 
   eff = effectsobj[['effects']]
 
@@ -715,11 +715,11 @@ plot.apceffects = function(effectsobj,
       sd(unlist(effectsobj$effects[[x]]))
     }))
 
-    names(sds) = effectsobj$windowvars
+    names(sds) = effectsobj$sampobj$windowvars
     sds = as.data.frame(sds)
 
     #sds$n = c(length(unique(tdat$a)),length(unique(tdat$p)),length(unique(tdat$c)))
-    sds$n = apply(effectsobj$sampobj$summaries[,effectsobj$windowvars],2,
+    sds$n = apply(effectsobj$sampobj$summaries[,effectsobj$sampobj$windowvars],2,
                   weighted.mean,w=effectsobj$sampobj$summaries$w)
     sds$se = sds$sds/sqrt(sds$n)
 
@@ -730,9 +730,9 @@ plot.apceffects = function(effectsobj,
 
   preds = preds %>%
     arrange(dim) %>%
-    mutate(dim_f = factor(dim,labels=effectsobj$windowvars))
+    mutate(dim_f = factor(dim,labels=effectsobj$sampobj$windowvars))
 
-  preds$dim_f = factor(preds$dim_f,levels=effectsobj$windowvars)
+  preds$dim_f = factor(preds$dim_f,levels=effectsobj$sampobj$windowvars)
 
   #return ggplot object
   plt = ggplot(preds,

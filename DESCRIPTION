@@ -12,5 +12,6 @@ Imports:
   MCMCpack,
   parallel,
   dplyr,
-  coda
+  coda,
+  ggplot2
 RoxygenNote: 6.0.1
