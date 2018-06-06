@@ -474,14 +474,14 @@ draw_effs = function(sampobj,
                         betas=FALSE,
                         tol=NULL){
 
-  require(dplyr)
+  #require(dplyr)
 
   dat = sampobj$data
 
-  #generate holer for effects dataframe (target of function)
-  apcvals = lapply(sampobj$apc,
+  #generate holder for effects dataframe (target of function)
+  apcvals = lapply(sampobj$windowvars,
                    function(x) unique(dat[,x]))
-  names(apcvals) = sampobj$apc
+  names(apcvals) = sampobj$windowvars
 
   effects = lapply(apcvals,function(x)
     data.frame(matrix(vector(),0,length(x))))
@@ -507,45 +507,39 @@ draw_effs = function(sampobj,
 
   for(s in s.index){
 
-    #sample number (easier to reference)
-    #snum = s.index[s]
-
     #reset dataframe
-    x=dat[,c('a','p','c')]
+    y=model.response(dat)
+    data = sampobj$data
 
-    breaks = sampobj$breaks
     #set window breaks
-    x$a = window(x$a,breaks=breaks$a[[s]])
-    x$p = window(x$p,breaks=breaks$p[[s]])
-    x$c = window(x$c,breaks=breaks$c[[s]])
+    for(d in sampobj$windowvars){
+      data[,d] = window(data[,d],breaks=sampobj$breaks[[d]][[s]])
+    }
 
-    #id dependent variable
-    y = dat[,sampobj$dv]
+    contrasts = as.list(rep('contr.sum',length(sampobj$windowvars)))
+    names(contrasts) = sampobj$windowvars
+
     #create model matrix with "effect coding"
-    xmat = model.matrix(~+a+p+c,data=x,
-                        contrasts.arg=list(
-                          a='contr.sum',
-                          p='contr.sum',
-                          c='contr.sum'
-                        ))
+    x = model.matrix(sampobj$formula,data=data,
+                        contrasts.arg=contrasts)
 
 
     ####
     #draw bayesian posterior
-    m = lin_gibbs(y=y,x=xmat,iter=1)
+    m = lin_gibbs(y=y,x=x,iter=1)
     fits = rbind(fits,m[c('r2','bic','bic_prime','sigma')])
 
     #caluclate marginalize effects, i.e. calcate marginal means using effects coding
     #this is just the sum of intercept and effect, ommited category is -1*sum(othercats)
     #omitted  categroy for effects coding in R is the last category
     #see Hardy 1993 and summary from APC project for examples
-    marginals = lapply(c('a','p','c'), FUN = function(d){
+    marginals = lapply(sampobj$windowvars, FUN = function(d){
                        e=as.data.frame(m$betas) %>% dplyr::select(starts_with(d))
                        #calculate effect ofr omitted category
                        e[,ncol(e)+1] = -1*rowSums(e)
                        #add grand mean for expected marginal
                        if(means){e = e + m$betas[,1]}
-                       colnames(e) = paste0(d,levels(x[,d]))
+                       colnames(e) = paste0(d,levels(data[,d]))
                        return(e)
 
                        })#end lapply
@@ -553,25 +547,27 @@ draw_effs = function(sampobj,
     #save intercept value / otherwise it is in the marginal...
     intercept = c(intercept,m$betas[1])
 
-    names(marginals) = c('a','p','c')
+    names(marginals) = sampobj$windowvars
 
+    #!here
     #generate dummy variables to describe full range of dimension
     blockdat = list()
-    blockdat$a = scopedummy(w=x$a,unique.vals=unique(dat$a))
-    blockdat$p = scopedummy(w=x$p,unique.vals=unique(dat$p))
-    blockdat$c = scopedummy(w=x$c,unique.vals=unique(dat$c))
+    for(d in sampobj$windowvars){
+      blockdat[[d]] = scopedummy(w=data[,d],
+                                 unique.vals=unique(sampobj$data[,d]))
+    }
 
 
-    predat=lapply(c('a','p','c'), FUN=function(d)
+    predat=lapply(sampobj$windowvars, FUN=function(d)
        model.matrix(~.-1,data=as.data.frame(blockdat[[d]])) %*%
          t(as.matrix(marginals[[d]]))
        )
 
-    names(predat) = c('a','p','c')
+    names(predat) = sampobj$windowvars
 
     #draw betas, if requested, across entire length
     if(betas){
-      beta = lapply(c('a','p','c'), FUN=function(d){
+      beta = lapply(sampobj$windowvars, FUN=function(d){
         b = m$betas[grepl(d,colnames(m$betas))]
         names(b) = paste0(d,levels(x[,d])[1:length(b)])
         return(b)
@@ -719,11 +715,11 @@ plot.apceffects = function(effectsobj,
       sd(unlist(effectsobj$effects[[x]]))
     }))
 
-    names(sds) = c('a','p','c')
+    names(sds) = effectsobj$windowvars
     sds = as.data.frame(sds)
 
     #sds$n = c(length(unique(tdat$a)),length(unique(tdat$p)),length(unique(tdat$c)))
-    sds$n = apply(effectsobj$sampobj$summaries[,c('a','p','c')],2,
+    sds$n = apply(effectsobj$sampobj$summaries[,effectsobj$windowvars],2,
                   weighted.mean,w=effectsobj$sampobj$summaries$w)
     sds$se = sds$sds/sqrt(sds$n)
 
@@ -734,9 +730,9 @@ plot.apceffects = function(effectsobj,
 
   preds = preds %>%
     arrange(dim) %>%
-    mutate(dim_f = factor(dim,labels=c('Age','Cohort','Period')))
+    mutate(dim_f = factor(dim,labels=effectsobj$windowvars))
 
-  preds$dim_f = factor(preds$dim_f,levels=c('Age','Period','Cohort'))
+  preds$dim_f = factor(preds$dim_f,levels=effectsobj$windowvars)
 
   #return ggplot object
   plt = ggplot(preds,
