@@ -35,6 +35,8 @@ what does this look like.
 }
 \examples{
 data(apcsim)
-apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
+apcsamp(y1~a + I(a^2) + p + c, data=apcsim,
+  windowvars=c('p','c'),method='ml',
+  samples=250,cores=4,chains=4)
 
 }

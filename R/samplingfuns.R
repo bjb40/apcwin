@@ -277,7 +277,9 @@ return(res)
 #'
 #' @examples
 #' data(apcsim)
-#' apcsamp(apcsim,method='ml',samples=250,cores=4,chains=4)
+#' apcsamp(y1~a + I(a^2) + p + c, data=apcsim,
+#'   windowvars=c('p','c'),method='ml',
+#'   samples=250,cores=4,chains=4)
 #'
 #' @export
 apcsamp = function(formula,data,windowvars=c('a','p','c'),
@@ -463,10 +465,10 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 #' @examples
 #' data(apcsim)
 #'
-#' sampleobject = apcsamp(apcsim,method='ml',
+#' sampleobject = apcsamp(y1~a+p+c,data=apcsim,method='ml',
 #' samples=250,cores=4,chains=4)
 #'
-#' effectsobject = draw_effs(sampleobject)
+#' effectsobject = draw_effs(sampleobject,tol=0.01)
 #'
 #' @export
 draw_effs = function(sampobj,

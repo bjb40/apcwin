@@ -25,9 +25,9 @@ Draws effect estimates from an APC sample using Bayesian Model Averaging.
 \examples{
 data(apcsim)
 
-sampleobject = apcsamp(apcsim,method='ml',
+sampleobject = apcsamp(y1~a+p+c,data=apcsim,method='ml',
 samples=250,cores=4,chains=4)
 
-effectsobject = draw_effs(sampleobject)
+effectsobject = draw_effs(sampleobject,tol=0.01)
 
 }
