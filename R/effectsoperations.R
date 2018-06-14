@@ -70,7 +70,7 @@ modeled_windows=function(effectsobj,pval=0.05){
     uvals[[d]] = unique(data[,d])[order(unique(data[,d]))]
   }
 
-  #fdraw differences from effects object
+  #draw differences from effects object
   dd = tstdiff(effectsobj)
   brk = lapply(dd,function(x){
     res = x$pval<=pval

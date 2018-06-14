@@ -46,6 +46,19 @@ sub4.m = lm(y~I(sin(p))+c+I(a+a),data=dat)
 sub5.m = lm(y~I(sin(c)*cos(a))+I(cos(c)*sin(a))+I(c-1950),data=dat)
 stargazer(list(sub4.m,sub5.m),type='text')
 
+library(lme4)
+library(apcwin)
+
+dat$pbreaks = cut(dat$p,round(diff(range(dat$p))/5))
+dat$cbreaks = cut(dat$c,round(diff(base::range(dat$c,na.rm=TRUE))/3))
+
+hapc = lmer(y~a+I(a^2) + (1|pbreaks) + (1|cbreaks),
+            REML=FALSE,
+            data=dat)
+
+library(merTools)
+tst = REsim(hapc)
+
 print(rbind(coef(true.m),coef(sub5.m)))
 
 noc=AIC(noc.m)

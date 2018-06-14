@@ -12,6 +12,29 @@ knitr::opts_chunk$set(echo = TRUE)
 library(apcwin)
 library(tidyverse)
 library(knitr)
+
+#Bollen, Kenneth A., Surajit Ray, Jane Zavisca, and Jeffrey J. Harden. 2012. “A Comparison of Bayes Factor Approximation Methods Including Two New Methods.” Sociological Methods & Research 41(2):294–324.
+
+SPBIC = function(model){
+  info = solve(vcov(model))
+  thinfoth = t(model$coef) %*% info %*% model$coef
+  pspbic.1 = as.numeric(length(model$coef)*
+                          (1-log(length(model$coef)/thinfoth)))
+
+  spbic.1 <- -2*as.numeric(logLik(model)) + pspbic.1
+  return(spbic.1)
+  
+}
+
+#takes lm model object; returns number
+IBIC = function(model){
+  idet <- log(1/base::detvcov(model)))
+  pibic <- length(model$coef)*log(length(model$fitted.values)/2*pi) + idet
+  ibic <- -2*as.numeric(logLik(model)) + pibic
+  
+  return(ibic)
+}
+
 ```
 ## Generating a Model Based on GSS
 
@@ -122,6 +145,25 @@ kable(
              substitute.3=AIC(sub3.m)),
   digits=2,
   caption='AIC from various models specifications.'
+)
+
+kable(
+  data.frame(True=BIC(true.m),
+             Substitute.1=BIC(sub1.m),
+             Substitute.2=BIC(sub2.m),
+             substitute.3=BIC(sub3.m)),
+  digits=2,
+  caption='BIC from various models specifications.'
+)
+
+
+kable(
+  data.frame(True=SPBIC(true.m),
+             Substitute.1=SPBIC(sub1.m),
+             Substitute.2=SPBIC(sub2.m),
+             substitute.3=SPBIC(sub3.m)),
+  digits=2,
+  caption='SPBIC from various models specifications.'
 )
 
 ```
