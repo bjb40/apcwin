@@ -4,7 +4,7 @@
 \alias{draw_effs}
 \title{Draws effect estimates from an APC sample using Bayesian Model Averaging.}
 \usage{
-draw_effs(sampobj, means = FALSE, betas = FALSE, tol = NULL)
+draw_effs(sampobj, means = FALSE, betas = FALSE, tol = NULL, ...)
 }
 \arguments{
 \item{sampobj}{An apcsamp object (\code{\link{apcsamp}})}

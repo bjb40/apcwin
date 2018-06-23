@@ -28,7 +28,7 @@ SPBIC = function(model){
 
 #takes lm model object; returns number
 IBIC = function(model){
-  idet <- log(1/base::detvcov(model)))
+  idet <- log(1/base::det(vcov(model)))
   pibic <- length(model$coef)*log(length(model$fitted.values)/2*pi) + idet
   ibic <- -2*as.numeric(logLik(model)) + pibic
   

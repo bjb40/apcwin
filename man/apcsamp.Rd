@@ -5,7 +5,7 @@
 \title{A wrapper for "draw_chains" that will use multiple search chains in the algorithm.}
 \usage{
 apcsamp(formula, data, windowvars = c("a", "p", "c"), cores = 1,
-  method = "ml", chains = 1, samples = 100, draws = 1000)
+  method = "ml", chains = 1, samples = 100, draws = 1000, ...)
 }
 \arguments{
 \item{formula}{A formula for a model.}

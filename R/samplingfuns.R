@@ -284,7 +284,8 @@ return(res)
 #' @export
 apcsamp = function(formula,data,windowvars=c('a','p','c'),
                    cores=1,method='ml',
-                   chains=1,samples=100,draws=1000){
+                   chains=1,samples=100,draws=1000,
+                   ...){
 
   #make sure data is in proper form, an listwise delete
   obs = nrow(data)
@@ -400,6 +401,93 @@ convergence = function(samp) {
   UseMethod('convergence',samp)
 }
 
+#' A wrapper for "draw_effs" that will use multiple cores to speed up sampling from the posterior.
+#'
+#' @param sampobj A sample object.
+#' @return An object of apceffects.
+#' @export
+postsamp = function(sampobj,tol=NULL,cores=NULL,...){
+
+  #get total draws from posterior and divide by cores
+  if(is.null(tol)){tol=1/sampobj$n.samples}
+  if(is.null(cores)){cores=sampobj$chains}
+  draws = ceiling(1/tol/cores) #round up
+
+  #create holder environment for parellel chains
+  par = new.env()
+
+  #assign environment data to pass arguments
+  assign('args',
+         list(sampobj=sampobj,tol=1/draws,...),
+         env=par)
+
+  cl <- parallel::makeCluster(mc <- getOption("cl.cores", cores))
+  parallel::clusterExport(cl=cl,varlist='args',envir=par)
+
+  chains=parallel::parLapply(cl=cl,1:cores,function(...){
+    args=get('args',env=par)
+    require(apcwin)
+    require(dplyr)
+    draw_effs(sampobj=args$sampobj,
+              tol = args$tol)
+  })
+
+  #end cluster
+  parallel::stopCluster(cl)
+  rm(par)
+
+  #unzip chains and rebuild result
+
+  res = list(
+    sampobj = sampobj,
+    fit = extract(chains,'fit',as.df=TRUE),
+    sampled = extract(chains,'sampled'),
+    intercept = extract(chains,'intercept')
+  )
+
+  for(i in sampobj$windowvars){
+    res[['effects']][[i]] = do.call(rbind,
+                                    lapply(chains,function(j)
+                                      j[['effects']][[i]]))
+  }
+
+  class(res) = 'apceffects'
+
+  return(res)
+
+}
+
+
+#' A wrapper that samples from model space and draws from posterior.
+#'
+#' @param formula a formula.
+#' @return An object of apceffects.
+#' @export
+#swslm = function(formula,data,windowvars=c('a','p','c'),method='ml',cores=1,chains=1,samples=1000,...){
+swslm = function(formula,...){
+
+  args = list(formula=formula,...)
+
+  #draw samples
+  sampobj <- do.call(apcsamp,args)
+
+  #draw from posterior
+  args[['sampobj']] = sampobj
+  effobj <- postsamp(sampobj)
+
+  #define and return implied data breaks
+
+
+  #return implied model object
+
+#  effobj[['imp_breaks']]
+#  effobj[['imp_model']]
+
+#  return(args)
+  return(effobj)
+
+
+}
 
 #' @export
 convergence.default = function(samp) {
@@ -450,7 +538,6 @@ extract = function(l,name,as.df=FALSE,span=NULL){
   return(res)
 }
 
-
 ###########
 #prepare estimated effects
 
@@ -472,9 +559,10 @@ extract = function(l,name,as.df=FALSE,span=NULL){
 #'
 #' @export
 draw_effs = function(sampobj,
-                        means=FALSE,
-                        betas=FALSE,
-                        tol=NULL){
+                     means=FALSE,
+                     betas=FALSE,
+                     tol=NULL,
+                     ...){
 
   #require(dplyr)
 

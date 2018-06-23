@@ -46,6 +46,9 @@ library(apcwin)
 data(apcsim)
 apcsim$c = apcsim$p-apcsim$a
 
+tst1.s = swsm(y1~a+p+c,data=apcsim,chains=3,
+              method='ml',cores=3,samples=10)
+
 #need to fix potential inconsistency with chains&cores
 #the summaries are way messed up; probably "extract" methods
 tst1 = apcsamp(y1~a+p+c,data=apcsim,chains=3,
